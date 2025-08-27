@@ -54,15 +54,15 @@ export function GameBoard({ gameState, revealingRow }: GameBoardProps) {
   };
 
   return (
-    <div className="grid grid-rows-6 gap-2 p-4">
+    <div className="grid grid-rows-6 gap-1 sm:gap-2 p-2 sm:p-4">
       {board.map((row, rowIndex) => (
-        <div key={rowIndex} className="grid grid-cols-5 gap-2 justify-center">
+        <div key={rowIndex} className="grid grid-cols-5 gap-1 sm:gap-2 justify-center">
           {row.map((letter, colIndex) => (
             <GameTile
               key={`${rowIndex}-${colIndex}`}
               letter={letter}
               state={getTileState(rowIndex, colIndex, letter)}
-              isRevealing={revealingRow === rowIndex}
+              isRevealing={gameState.gameStatus === 'playing' && revealingRow === rowIndex}
               delay={colIndex * 100}
             />
           ))}

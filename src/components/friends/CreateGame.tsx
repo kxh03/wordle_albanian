@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -6,12 +6,56 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { normalizeAlbanian, isValidAlbanianWord } from '@/utils/albanian';
 import { useToast } from '@/hooks/use-toast';
 import { Share2, Copy } from 'lucide-react';
+import { KeyboardOverlay } from '@/components/game/KeyboardOverlay';
 
 export function CreateGame() {
   const [word, setWord] = useState('');
   const [creatorName, setCreatorName] = useState('');
   const [gameLink, setGameLink] = useState('');
   const { toast } = useToast();
+  const base64UrlEncode = (input: string) => {
+    return btoa(input)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+  };
+
+  // Handle on-screen Albanian keyboard input for the word field
+  const handleVirtualKey = useCallback((key: string) => {
+    if (key === 'BACKSPACE') {
+      setWord(prev => prev.slice(0, Math.max(0, prev.length - 1)));
+      return;
+    }
+    if (key === 'ENTER') {
+      // ignore ENTER on create screen
+      return;
+    }
+    // Append letter if space available
+    setWord(prev => (prev.length < 5 ? (prev + key).toUpperCase() : prev));
+  }, []);
+
+  // Allow only Backspace/Delete from physical keyboard on the word field
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      // Only affect when focused within this page
+      const active = document.activeElement as HTMLElement | null;
+      const isWordFieldActive = active && active.id === 'word';
+      if (!isWordFieldActive) return;
+
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const key = event.key.toUpperCase();
+      if (key === 'BACKSPACE' || key === 'DELETE') {
+        // We manage deletion ourselves to keep state in sync
+        event.preventDefault();
+        setWord(prev => prev.slice(0, Math.max(0, prev.length - 1)));
+      } else {
+        // Block any other physical typing
+        event.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   const handleCreateGame = () => {
     const normalizedWord = normalizeAlbanian(word);
@@ -34,16 +78,14 @@ export function CreateGame() {
       return;
     }
 
-    // Generate game ID and link (in a real app, this would be stored in a database)
-    const gameId = btoa(`${normalizedWord}-${creatorName}-${Date.now()}`).replace(/[/+=]/g, '');
-    const link = `${window.location.origin}/friends/${gameId}`;
-    
-    // Store game data in localStorage (in a real app, use backend)
-    localStorage.setItem(`game-${gameId}`, JSON.stringify({
+    // Create a self-contained base64url JSON payload so the link works without localStorage
+    const payload = {
       word: normalizedWord,
       creatorName: creatorName.trim(),
       createdAt: Date.now()
-    }));
+    };
+    const gameId = base64UrlEncode(JSON.stringify(payload));
+    const link = `${window.location.origin}/friends/${gameId}`;
 
     setGameLink(link);
     
@@ -86,8 +128,8 @@ export function CreateGame() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen h-screen bg-gradient-subtle flex items-center justify-center p-4 pb-0 overflow-hidden overscroll-none">
+      <Card className="w-full max-w-md touch-none" onTouchMove={(e) => e.preventDefault()}>
         <CardHeader className="text-center">
           <CardTitle className="text-2xl bg-gradient-hero bg-clip-text text-transparent">
             Krijo Lojë për Miqtë
@@ -99,11 +141,12 @@ export function CreateGame() {
             <Input
               id="word"
               value={word}
-              onChange={(e) => setWord(e.target.value.toUpperCase())}
+              onChange={() => { /* input editing disabled; use on-screen keyboard */ }}
               maxLength={5}
               placeholder="FJALË"
               className="text-center text-lg font-mono"
             />
+            {/* Inline keyboard removed to avoid duplicates */}
           </div>
           
           <div className="space-y-2">
@@ -157,6 +200,13 @@ export function CreateGame() {
           )}
         </CardContent>
       </Card>
+
+      {/* Single bottom-fixed keyboard overlay via portal */}
+      <KeyboardOverlay
+        onKeyPress={handleVirtualKey}
+        letterStates={new Map()}
+        disabled={false}
+      />
     </div>
   );
 }

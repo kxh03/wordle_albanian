@@ -25,7 +25,7 @@ export function GameCompleteAnimation({ isWon, attempts, isVisible }: GameComple
         <>
           {/* Main trophy animation */}
           <div className="animate-bounce-in">
-            <div className="bg-primary/20 backdrop-blur-sm rounded-full p-8 animate-glow">
+            <div className="bg-primary/20 backdrop-blur-sm rounded-full p-8">
               <Trophy className="w-16 h-16 text-primary" />
             </div>
           </div>
@@ -36,7 +36,7 @@ export function GameCompleteAnimation({ isWon, attempts, isVisible }: GameComple
               {[...Array(6)].map((_, i) => (
                 <Star
                   key={i}
-                  className={`absolute w-6 h-6 text-yellow-400 animate-ping`}
+                  className={`absolute w-6 h-6 text-yellow-400`}
                   style={{
                     top: `${30 + Math.random() * 40}%`,
                     left: `${20 + Math.random() * 60}%`,
@@ -50,7 +50,7 @@ export function GameCompleteAnimation({ isWon, attempts, isVisible }: GameComple
               {[...Array(12)].map((_, i) => (
                 <Sparkles
                   key={`sparkle-${i}`}
-                  className={`absolute w-4 h-4 text-primary animate-pulse`}
+                  className={`absolute w-4 h-4 text-primary`}
                   style={{
                     top: `${10 + Math.random() * 80}%`,
                     left: `${10 + Math.random() * 80}%`,

@@ -4,7 +4,7 @@ export const ALBANIAN_ALPHABET = [
 ];
 
 export const KEYBOARD_LAYOUT = [
-  ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Ë'],
+  ['Q', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Ë'],
   ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ç'],
   ['ENTER', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', 'BACKSPACE']
 ];

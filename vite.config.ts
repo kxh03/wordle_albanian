@@ -5,6 +5,7 @@ import path from "path";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
+    allowedHosts: ['18f5247b6c2d.ngrok-free.app'],
     host: "::",
     port: 8080,
   },

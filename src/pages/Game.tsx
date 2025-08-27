@@ -48,13 +48,17 @@ export default function Game() {
   }, [gameState.gameStatus, gameState.targetWord, gameState.currentRow, toast]);
 
   return (
-    <div className="min-h-screen bg-gradient-subtle flex flex-col">
+    <div className="min-h-screen h-screen bg-gradient-subtle flex flex-col overflow-hidden overscroll-none">
       <GameHeader 
         title="Wordle Shqip" 
         onReset={() => resetGame(getRandomWord())}
       />
       
-      <main className="flex-1 flex flex-col items-center justify-center max-w-lg mx-auto w-full px-4">
+      <main 
+        className="flex-1 flex flex-col items-center justify-center max-w-lg mx-auto w-full px-4 touch-none"
+        onTouchMove={(e) => e.preventDefault()}
+        onWheel={(e) => e.preventDefault() as unknown as void}
+      >
         <GameBoard 
           gameState={gameState} 
           revealingRow={isRevealing ? gameState.currentRow - 1 : undefined}

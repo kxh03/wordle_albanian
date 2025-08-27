@@ -1,11 +1,14 @@
 import { useState, useCallback } from 'react';
 import { GameState, LetterState } from '@/types/game';
-import { normalizeAlbanian, isValidAlbanianWord } from '@/utils/albanian';
+import { normalizeAlbanian } from '@/utils/albanian';
+import { ensureDictionaryLoaded, isValidGuess } from '@/utils/dictionary';
 
 const ROWS = 6;
 const COLS = 5;
 
 export function useWordleGame(targetWord: string, gameId?: string) {
+  // Kick off dictionary loading once per hook usage
+  ensureDictionaryLoaded();
   const [gameState, setGameState] = useState<GameState>(() => {
     const normalized = normalizeAlbanian(targetWord);
     const storageKey = gameId ? `friends-game-${gameId}` : `daily-game-progress`;
@@ -73,15 +76,16 @@ export function useWordleGame(targetWord: string, gameId?: string) {
         if (newState.currentCol === COLS) {
           const currentGuess = newState.board[newState.currentRow].join('');
           
-          // Check if the word is valid (you can enhance this with your JSON file)
-          if (isValidAlbanianWord(currentGuess)) {
+          // Check if the word is valid: must be in dictionary-based set
+          const normalizedGuess = normalizeAlbanian(currentGuess);
+          if (isValidGuess(normalizedGuess)) {
             newState.guesses.push(currentGuess);
             
             // Update letter states
             newState.letterStates = updateLetterStates(currentGuess, newState.targetWord);
             
             // Check if won
-            if (currentGuess === newState.targetWord) {
+            if (normalizedGuess === newState.targetWord) {
               newState.gameStatus = 'won';
             } else if (newState.currentRow === ROWS - 1) {
               newState.gameStatus = 'lost';

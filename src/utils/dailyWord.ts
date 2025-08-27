@@ -1,4 +1,4 @@
-import { SAMPLE_WORDS } from './albanian';
+import { getFiveLetterTermsSync } from './dictionary';
 
 // Get today's date as a string (YYYY-MM-DD) in local timezone
 export function getTodayDateString(): string {
@@ -6,6 +6,13 @@ export function getTodayDateString(): string {
   const year = now.getFullYear();
   const month = (now.getMonth() + 1).toString().padStart(2, '0');
   const day = now.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function getDateString(date: Date): string {
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 
@@ -24,8 +31,19 @@ function simpleHash(str: string): number {
 export function getDailyWord(): string {
   const dateStr = getTodayDateString();
   const hash = simpleHash(dateStr);
-  const index = hash % SAMPLE_WORDS.length;
-  return SAMPLE_WORDS[index];
+  const terms = getFiveLetterTermsSync();
+  const pool = terms.length > 0 ? terms : ['FJALË'];
+  const index = hash % pool.length;
+  return pool[index];
+}
+
+export function getWordForDate(date: Date): string {
+  const dateStr = getDateString(date);
+  const hash = simpleHash(dateStr);
+  const terms = getFiveLetterTermsSync();
+  const pool = terms.length > 0 ? terms : ['FJALË'];
+  const index = hash % pool.length;
+  return pool[index];
 }
 
 // Get formatted date for display
@@ -36,6 +54,15 @@ export function getFormattedDate(): string {
     year: 'numeric', 
     month: 'long', 
     day: 'numeric' 
+  });
+}
+
+export function formatDate(date: Date): string {
+  return date.toLocaleDateString('sq-AL', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
   });
 }
 

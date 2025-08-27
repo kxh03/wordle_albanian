@@ -2,27 +2,30 @@ import { useEffect, useState } from 'react';
 import { GameBoard } from '@/components/game/GameBoard';
 import { AlbanianKeyboard } from '@/components/game/AlbanianKeyboard';
 import { GameHeader } from '@/components/game/GameHeader';
-import { StatisticsModal } from '@/components/game/StatisticsModal';
 import { HelpModal } from '@/components/game/HelpModal';
+import { KeyboardOverlay } from '@/components/game/KeyboardOverlay';
 import { useWordleGame } from '@/hooks/useWordleGame';
-import { useGameStatistics } from '@/hooks/useGameStatistics';
-import { getDailyWord, getFormattedDate, isNewDay, markTodayAsPlayed, getTodayDateString } from '@/utils/dailyWord';
+// import { useGameStatistics } from '@/hooks/useGameStatistics';
+import { getDailyWord, getFormattedDate, isNewDay, markTodayAsPlayed, getTodayDateString, getWordForDate, formatDate } from '@/utils/dailyWord';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Calendar, Trophy, Share2, Sparkles } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarUI } from '@/components/ui/calendar';
 
 export default function Daily() {
   const { toast } = useToast();
-  const [dailyWord] = useState(() => getDailyWord());
+  const [dailyWord, setDailyWord] = useState(() => getDailyWord());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [hasPlayedToday, setHasPlayedToday] = useState(false);
-  const [showStats, setShowStats] = useState(false);
+  // const [showStats, setShowStats] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [isWinAnimating, setIsWinAnimating] = useState(false);
   
   const gameId = `daily-${getTodayDateString()}`;
   const { gameState, isRevealing, handleKeyPress, resetGame } = useWordleGame(dailyWord, gameId);
-  const { statistics, updateStatistics, resetStatistics } = useGameStatistics();
+  // Statistics removed
 
   // Check if player has already completed today's puzzle
   useEffect(() => {
@@ -74,7 +77,7 @@ export default function Daily() {
       
       localStorage.setItem(`daily-completed-${getTodayDateString()}`, JSON.stringify(completionData));
       setHasPlayedToday(true);
-      updateStatistics(true, attempts);
+      // statistics removed
       
       // Trigger win animation
       setIsWinAnimating(true);
@@ -95,14 +98,14 @@ export default function Daily() {
       
       localStorage.setItem(`daily-completed-${getTodayDateString()}`, JSON.stringify(completionData));
       setHasPlayedToday(true);
-      updateStatistics(false);
+      // statistics removed
       
       toast({
         title: 'Më keq sot! 😅',
         description: `Fjala e sotme ishte "${gameState.targetWord}". Kthehuni nesër për një sfidë të re!`,
       });
     }
-  }, [gameState.gameStatus, gameState.targetWord, gameState.currentRow, toast, updateStatistics]);
+  }, [gameState.gameStatus, gameState.targetWord, gameState.currentRow, toast]);
 
   const shareResults = () => {
     const attempts = gameState.gameStatus === 'won' ? gameState.currentRow + 1 : 'X';
@@ -141,13 +144,37 @@ export default function Daily() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-subtle flex flex-col">
+    <div className="min-h-screen h-screen bg-gradient-subtle flex flex-col overflow-hidden overscroll-none">
       <GameHeader 
         title="Wordle Shqip - Dita"
         showFriendsButton={true}
         showHomeButton={true}
         onHelpClick={() => setShowHelp(true)}
-        onStatsClick={() => setShowStats(true)}
+        // onStatsClick removed
+        rightSlot={
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                <Calendar className="w-4 h-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <CalendarUI
+                mode="single"
+                selected={selectedDate ?? new Date()}
+                onSelect={(date) => {
+                  if (!date) return;
+                  setSelectedDate(date);
+                  const word = getWordForDate(date);
+                  setDailyWord(word);
+                  resetGame(word);
+                }}
+                disabled={(date) => date > new Date()}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        }
       />
       
       {/* Daily Info */}
@@ -158,7 +185,7 @@ export default function Daily() {
               <Calendar className="w-5 h-5 text-primary" />
               <div>
                 <p className="font-semibold">Fjala e Sotme</p>
-                <p className="text-sm text-muted-foreground">{getFormattedDate()}</p>
+                <p className="text-sm text-muted-foreground">{selectedDate ? formatDate(selectedDate) : getFormattedDate()}</p>
               </div>
             </div>
             {hasPlayedToday && (
@@ -171,8 +198,12 @@ export default function Daily() {
         </Card>
       </div>
       
-      <main className="flex-1 flex flex-col items-center justify-center max-w-lg mx-auto w-full px-4">
-        <div className={isWinAnimating ? 'animate-bounce-in' : ''}>
+      <main 
+        className="flex-1 flex flex-col items-center justify-start max-w-lg mx-auto w-full px-4 gap-2 touch-none"
+        onTouchMove={(e) => e.preventDefault()}
+        onWheel={(e) => e.preventDefault() as unknown as void}
+      >
+        <div className="touch-none" onTouchMove={(e) => e.preventDefault()}>
           <GameBoard 
             gameState={gameState} 
             revealingRow={isRevealing ? gameState.currentRow - 1 : undefined}
@@ -183,11 +214,11 @@ export default function Daily() {
           <div className="mt-6 text-center space-y-4">
             {gameState.gameStatus === 'won' && (
               <div className="flex items-center justify-center gap-2 mb-4">
-                <Sparkles className="w-5 h-5 text-primary animate-pulse" />
+                <Sparkles className="w-5 h-5 text-primary" />
                 <span className="text-lg font-semibold text-primary">
                   Përkrahje! {gameState.currentRow + 1}/6
                 </span>
-                <Sparkles className="w-5 h-5 text-primary animate-pulse" />
+                <Sparkles className="w-5 h-5 text-primary" />
               </div>
             )}
             
@@ -200,15 +231,7 @@ export default function Daily() {
                 <Share2 className="w-4 h-4 mr-2" />
                 Ndaj
               </Button>
-              <Button 
-                onClick={() => setShowStats(true)}
-                size="lg"
-                variant="outline"
-                className="flex-1"
-              >
-                <Trophy className="w-4 h-4 mr-2" />
-                Statistikat
-              </Button>
+              {/* Statistics button removed */}
             </div>
             
             <p className="text-sm text-muted-foreground">
@@ -218,21 +241,13 @@ export default function Daily() {
         )}
       </main>
       
-      <div className="pb-6">
-        <AlbanianKeyboard
-          onKeyPress={handleKeyPress}
-          letterStates={gameState.letterStates}
-          disabled={gameState.gameStatus !== 'playing'}
-        />
-      </div>
+      <KeyboardOverlay
+        onKeyPress={handleKeyPress}
+        letterStates={gameState.letterStates}
+        disabled={gameState.gameStatus !== 'playing'}
+      />
       
       {/* Modals */}
-      <StatisticsModal 
-        isOpen={showStats}
-        onClose={() => setShowStats(false)}
-        statistics={statistics}
-        onReset={resetStatistics}
-      />
       
       <HelpModal 
         isOpen={showHelp}

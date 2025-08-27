@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { GameBoard } from '@/components/game/GameBoard';
-import { AlbanianKeyboard } from '@/components/game/AlbanianKeyboard';
+import { KeyboardOverlay } from '@/components/game/KeyboardOverlay';
 import { GameHeader } from '@/components/game/GameHeader';
 import { useWordleGame } from '@/hooks/useWordleGame';
 import { useToast } from '@/hooks/use-toast';
@@ -20,24 +20,38 @@ export default function FriendsGame() {
       setNotFound(true);
       return;
     }
+    // Try self-contained base64url payload in the URL first
+    try {
+      const base64 = gameId.replace(/-/g, '+').replace(/_/g, '/');
+      const json = atob(base64);
+      const parsed = JSON.parse(json);
+      if (parsed && parsed.word && parsed.creatorName) {
+        setCustomGame({
+          id: gameId,
+          word: parsed.word,
+          creatorName: parsed.creatorName,
+          createdAt: parsed.createdAt || Date.now()
+        });
+        return;
+      }
+    } catch (_e) {
+      // fall through to localStorage fallback
+    }
 
     const gameData = localStorage.getItem(`game-${gameId}`);
-    if (!gameData) {
-      setNotFound(true);
-      return;
+    if (gameData) {
+      try {
+        const parsed = JSON.parse(gameData);
+        setCustomGame({
+          id: gameId,
+          word: parsed.word,
+          creatorName: parsed.creatorName,
+          createdAt: parsed.createdAt
+        });
+        return;
+      } catch (_e) {}
     }
-
-    try {
-      const parsed = JSON.parse(gameData);
-      setCustomGame({
-        id: gameId,
-        word: parsed.word,
-        creatorName: parsed.creatorName,
-        createdAt: parsed.createdAt
-      });
-    } catch (error) {
-      setNotFound(true);
-    }
+    setNotFound(true);
   }, [gameId]);
 
   const { gameState, isRevealing, handleKeyPress, resetGame } = useWordleGame(
@@ -45,7 +59,7 @@ export default function FriendsGame() {
     gameId
   );
 
-  // Handle keyboard events
+  // Handle keyboard events (only allow Backspace/Delete from physical keyboard)
   useEffect(() => {
     if (!customGame) return;
 
@@ -56,10 +70,9 @@ export default function FriendsGame() {
       
       if (key === 'BACKSPACE' || key === 'DELETE') {
         handleKeyPress('BACKSPACE');
-      } else if (key === 'ENTER') {
-        handleKeyPress('ENTER');
-      } else if (/^[A-ZËÇGJ]$/.test(key)) {
-        handleKeyPress(key);
+      } else {
+        // Ignore all other physical keys; use on-screen Albanian keyboard instead
+        event.preventDefault();
       }
     };
 
@@ -100,7 +113,7 @@ export default function FriendsGame() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-subtle flex flex-col">
+    <div className="min-h-screen h-screen bg-gradient-subtle flex flex-col overflow-hidden overscroll-none">
       <GameHeader 
         title="Wordle Shqip" 
         creatorName={customGame.creatorName}
@@ -108,7 +121,11 @@ export default function FriendsGame() {
         showFriendsButton={false}
       />
       
-      <main className="flex-1 flex flex-col items-center justify-center max-w-lg mx-auto w-full px-4">
+      <main 
+        className="flex-1 flex flex-col items-center justify-center max-w-lg mx-auto w-full px-4 touch-none"
+        onTouchMove={(e) => e.preventDefault()}
+        onWheel={(e) => e.preventDefault() as unknown as void}
+      >
         <GameBoard 
           gameState={gameState} 
           revealingRow={isRevealing ? gameState.currentRow - 1 : undefined}
@@ -127,13 +144,11 @@ export default function FriendsGame() {
         )}
       </main>
       
-      <div className="pb-6">
-        <AlbanianKeyboard
-          onKeyPress={handleKeyPress}
-          letterStates={gameState.letterStates}
-          disabled={gameState.gameStatus !== 'playing'}
-        />
-      </div>
+      <KeyboardOverlay
+        onKeyPress={handleKeyPress}
+        letterStates={gameState.letterStates}
+        disabled={gameState.gameStatus !== 'playing'}
+      />
     </div>
   );
 }
