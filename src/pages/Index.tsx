@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { GameHeader } from "@/components/game/GameHeader";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import { Play, Users, Info, Calendar } from "lucide-react";
@@ -6,10 +7,13 @@ import { Play, Users, Info, Calendar } from "lucide-react";
 const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-subtle">
-      <header className="text-center py-12">
-        <h1 className="text-5xl font-bold bg-gradient-hero bg-clip-text text-transparent mb-4">
-          Wordle Shqip
-        </h1>
+      <GameHeader title="" showFriendsButton={true} />
+      <header className="text-center py-8">
+        <img
+          src="/assets/6ml_final.png"
+          alt="me llafe"
+          className="mx-auto mb-6 rounded-2xl shadow w-28 sm:w-32 md:w-40 lg:w-48 h-auto object-contain"
+        />
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto px-4">
           Loja e fjalëve më e dashur në botë, tani në gjuhën shqipe!
         </p>
@@ -119,7 +123,7 @@ const Index = () => {
       </main>
 
       <footer className="text-center py-8 text-muted-foreground">
-        <p>© 2024 Wordle Shqip - Krijuar me ❤️ për komunitetin shqiptar</p>
+        <p>© 2024 6 Llafe - Krijuar me ❤️ për komunitetin shqiptar</p>
       </footer>
     </div>
   );

@@ -46,14 +46,16 @@ export function useWordleGame(targetWord: string, gameId?: string) {
 
   const updateLetterStates = useCallback((guess: string, target: string) => {
     const newLetterStates = new Map(gameState.letterStates);
+    const normalizedGuess = normalizeAlbanian(guess);
+    const normalizedTarget = normalizeAlbanian(target);
     
-    for (let i = 0; i < guess.length; i++) {
-      const letter = guess[i];
-      if (letter === target[i]) {
+    for (let i = 0; i < normalizedGuess.length; i++) {
+      const letter = normalizedGuess[i];
+      if (letter === normalizedTarget[i]) {
         newLetterStates.set(letter, 'correct');
-      } else if (target.includes(letter) && newLetterStates.get(letter) !== 'correct') {
+      } else if (normalizedTarget.includes(letter) && newLetterStates.get(letter) !== 'correct') {
         newLetterStates.set(letter, 'partial');
-      } else if (!target.includes(letter)) {
+      } else if (!normalizedTarget.includes(letter)) {
         newLetterStates.set(letter, 'incorrect');
       }
     }
@@ -76,16 +78,25 @@ export function useWordleGame(targetWord: string, gameId?: string) {
         if (newState.currentCol === COLS) {
           const currentGuess = newState.board[newState.currentRow].join('');
           
-          // Check if the word is valid: must be in dictionary-based set
+          // Validation rules
           const normalizedGuess = normalizeAlbanian(currentGuess);
-          if (isValidGuess(normalizedGuess)) {
-            newState.guesses.push(currentGuess);
+          const target = newState.targetWord; // already normalized
+          const isTargetMatch = normalizedGuess === target;
+          const isDictionaryOk = isValidGuess(normalizedGuess);
+          const isValid = gameId ? normalizedGuess.length === COLS : (isTargetMatch || isDictionaryOk);
+
+          if (isValid) {
+            newState.guesses.push(normalizedGuess);
             
             // Update letter states
-            newState.letterStates = updateLetterStates(currentGuess, newState.targetWord);
+            newState.letterStates = updateLetterStates(normalizedGuess, target);
             
             // Check if won
-            if (normalizedGuess === newState.targetWord) {
+            let allEqual = true;
+            for (let i = 0; i < COLS; i++) {
+              if (normalizedGuess[i] !== target[i]) { allEqual = false; break; }
+            }
+            if (allEqual) {
               newState.gameStatus = 'won';
             } else if (newState.currentRow === ROWS - 1) {
               newState.gameStatus = 'lost';
@@ -100,7 +111,8 @@ export function useWordleGame(targetWord: string, gameId?: string) {
           }
         }
       } else if (newState.currentCol < COLS && key.length === 1) {
-        newState.board[newState.currentRow][newState.currentCol] = key;
+        const normKey = normalizeAlbanian(key);
+        newState.board[newState.currentRow][newState.currentCol] = normKey;
         newState.currentCol++;
       }
       

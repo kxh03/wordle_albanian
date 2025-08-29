@@ -1,5 +1,6 @@
 import { GameTile } from './GameTile';
 import { GameState } from '@/types/game';
+import { normalizeAlbanian } from '@/utils/albanian';
 
 interface GameBoardProps {
   gameState: GameState;
@@ -12,24 +13,25 @@ export function GameBoard({ gameState, revealingRow }: GameBoardProps) {
   const getTileState = (row: number, col: number, letter: string) => {
     if (row < gameState.currentRow || (row === gameState.currentRow && gameState.gameStatus !== 'playing')) {
       // Completed row - calculate state based on target word
-      const targetWord = gameState.targetWord;
-      if (!letter) return 'unused';
+      const targetWord = normalizeAlbanian(gameState.targetWord);
+      const normalizedLetter = normalizeAlbanian(letter);
+      if (!normalizedLetter) return 'unused';
       
-      if (letter === targetWord[col]) {
+      if (normalizedLetter === targetWord[col]) {
         return 'correct';
-      } else if (targetWord.includes(letter)) {
+      } else if (targetWord.includes(normalizedLetter)) {
         // Check if this letter appears later in the target at the correct position
         // to avoid false positives with repeated letters
         const targetLetters = targetWord.split('');
-        const guessLetters = gameState.board[row];
+        const guessLetters = board[row].map(normalizeAlbanian);
         
         // Count correct positions first
         let correctCount = 0;
         let availableCount = 0;
         
         for (let i = 0; i < targetLetters.length; i++) {
-          if (targetLetters[i] === letter) {
-            if (guessLetters[i] === letter) {
+          if (targetLetters[i] === normalizedLetter) {
+            if (guessLetters[i] === normalizedLetter) {
               correctCount++;
             } else {
               availableCount++;
@@ -40,7 +42,7 @@ export function GameBoard({ gameState, revealingRow }: GameBoardProps) {
         // Count partials before this position
         let partialsBefore = 0;
         for (let i = 0; i < col; i++) {
-          if (guessLetters[i] === letter && targetLetters[i] !== letter) {
+          if (guessLetters[i] === normalizedLetter && targetLetters[i] !== normalizedLetter) {
             partialsBefore++;
           }
         }

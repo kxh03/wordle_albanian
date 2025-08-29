@@ -21,7 +21,7 @@ export function getRandomWord(): string {
 }
 
 export function normalizeAlbanian(text: string): string {
-  return text.toUpperCase().trim();
+  return text.toUpperCase().normalize('NFC').trim();
 }
 
 export function isValidAlbanianWord(word: string): boolean {

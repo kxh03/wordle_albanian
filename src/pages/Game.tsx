@@ -50,7 +50,7 @@ export default function Game() {
   return (
     <div className="min-h-screen h-screen bg-gradient-subtle flex flex-col overflow-hidden overscroll-none">
       <GameHeader 
-        title="Wordle Shqip" 
+        title="" 
         onReset={() => resetGame(getRandomWord())}
       />
       

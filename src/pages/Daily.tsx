@@ -26,7 +26,6 @@ export default function Daily() {
   const gameId = `daily-${getTodayDateString()}`;
   const { gameState, isRevealing, handleKeyPress, resetGame } = useWordleGame(dailyWord, gameId);
   // Statistics removed
-
   // Check if player has already completed today's puzzle
   useEffect(() => {
     const completedToday = localStorage.getItem(`daily-completed-${getTodayDateString()}`);
@@ -146,7 +145,7 @@ export default function Daily() {
   return (
     <div className="min-h-screen h-screen bg-gradient-subtle flex flex-col overflow-hidden overscroll-none">
       <GameHeader 
-        title="Wordle Shqip - Dita"
+        title=""
         showFriendsButton={true}
         showHomeButton={true}
         onHelpClick={() => setShowHelp(true)}

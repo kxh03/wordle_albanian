@@ -5,8 +5,17 @@ import { KeyboardOverlay } from '@/components/game/KeyboardOverlay';
 import { GameHeader } from '@/components/game/GameHeader';
 import { useWordleGame } from '@/hooks/useWordleGame';
 import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
 import { CustomGame } from '@/types/game';
+
+function base64UrlDecodeUtf8(input: string): string {
+  const base64 = input.replace(/-/g, '+').replace(/_/g, '/');
+  const bin = atob(base64);
+  // Convert binary string to percent-encoded and decode
+  const pctEncoded = Array.prototype.map
+    .call(bin, (c: string) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0'))
+    .join('');
+  return decodeURIComponent(pctEncoded);
+}
 
 export default function FriendsGame() {
   const { gameId } = useParams();
@@ -22,8 +31,7 @@ export default function FriendsGame() {
     }
     // Try self-contained base64url payload in the URL first
     try {
-      const base64 = gameId.replace(/-/g, '+').replace(/_/g, '/');
-      const json = atob(base64);
+      const json = base64UrlDecodeUtf8(gameId);
       const parsed = JSON.parse(json);
       if (parsed && parsed.word && parsed.creatorName) {
         setCustomGame({
@@ -59,6 +67,13 @@ export default function FriendsGame() {
     gameId
   );
 
+  // Ensure the target word is set after async load of customGame
+  useEffect(() => {
+    if (customGame?.word) {
+      resetGame(customGame.word);
+    }
+  }, [customGame?.word, resetGame]);
+
   // Handle keyboard events (only allow Backspace/Delete from physical keyboard)
   useEffect(() => {
     if (!customGame) return;
@@ -86,13 +101,13 @@ export default function FriendsGame() {
 
     if (gameState.gameStatus === 'won') {
       toast({
-        title: 'Urime! 🎉',
-        description: `E gjetët fjalën e ${customGame.creatorName} në ${gameState.currentRow + 1} përpjekje!`,
+        title: 'You won! 🎉',
+        description: `You guessed ${customGame.creatorName}'s word!`,
       });
     } else if (gameState.gameStatus === 'lost') {
       toast({
-        title: 'Më keq sot! 😅',
-        description: `Fjala e ${customGame.creatorName} ishte "${gameState.targetWord}". Provo sërish!`,
+        title: 'Better luck next time 😅',
+        description: `The word from ${customGame.creatorName} was "${gameState.targetWord}".`,
       });
     }
   }, [gameState.gameStatus, gameState.targetWord, gameState.currentRow, customGame, toast]);
@@ -115,10 +130,10 @@ export default function FriendsGame() {
   return (
     <div className="min-h-screen h-screen bg-gradient-subtle flex flex-col overflow-hidden overscroll-none">
       <GameHeader 
-        title="Wordle Shqip" 
-        creatorName={customGame.creatorName}
+        title="" 
         onReset={() => resetGame(customGame.word)}
         showFriendsButton={false}
+        creatorName={customGame.creatorName}
       />
       
       <main 
@@ -131,17 +146,7 @@ export default function FriendsGame() {
           revealingRow={isRevealing ? gameState.currentRow - 1 : undefined}
         />
         
-        {gameState.gameStatus !== 'playing' && (
-          <div className="mt-6 text-center space-y-4">
-            <Button 
-              onClick={() => resetGame(customGame.word)} 
-              size="lg"
-              className="px-8"
-            >
-              Provo Sërish
-            </Button>
-          </div>
-        )}
+        {/* Removed retry button for friends mode */}
       </main>
       
       <KeyboardOverlay
