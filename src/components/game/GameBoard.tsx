@@ -1,20 +1,22 @@
 import { GameTile } from './GameTile';
 import { GameState } from '@/types/game';
-import { normalizeAlbanian } from '@/utils/albanian';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface GameBoardProps {
   gameState: GameState;
   revealingRow?: number;
+  getTargetWord?: () => string;
 }
 
-export function GameBoard({ gameState, revealingRow }: GameBoardProps) {
+export function GameBoard({ gameState, revealingRow, getTargetWord }: GameBoardProps) {
   const { board, letterStates } = gameState;
+  const { config } = useLanguage();
 
   const getTileState = (row: number, col: number, letter: string) => {
     if (row < gameState.currentRow || (row === gameState.currentRow && gameState.gameStatus !== 'playing')) {
       // Completed row - calculate state based on target word
-      const targetWord = normalizeAlbanian(gameState.targetWord);
-      const normalizedLetter = normalizeAlbanian(letter);
+      const targetWord = config.normalizeFunction(getTargetWord ? getTargetWord() : "");
+      const normalizedLetter = config.normalizeFunction(letter);
       if (!normalizedLetter) return 'unused';
       
       if (normalizedLetter === targetWord[col]) {
@@ -23,7 +25,7 @@ export function GameBoard({ gameState, revealingRow }: GameBoardProps) {
         // Check if this letter appears later in the target at the correct position
         // to avoid false positives with repeated letters
         const targetLetters = targetWord.split('');
-        const guessLetters = board[row].map(normalizeAlbanian);
+        const guessLetters = board[row].map(config.normalizeFunction);
         
         // Count correct positions first
         let correctCount = 0;
@@ -56,7 +58,7 @@ export function GameBoard({ gameState, revealingRow }: GameBoardProps) {
   };
 
   return (
-    <div className="grid grid-rows-6 gap-1 sm:gap-2 p-2 sm:p-4">
+    <div className="grid grid-rows-6 gap-1 sm:gap-2 p-1 sm:p-2 md:p-4 w-full max-w-sm sm:max-w-md mx-auto">
       {board.map((row, rowIndex) => (
         <div key={rowIndex} className="grid grid-cols-5 gap-1 sm:gap-2 justify-center">
           {row.map((letter, colIndex) => (

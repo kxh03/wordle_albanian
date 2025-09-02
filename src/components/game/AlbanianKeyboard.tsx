@@ -1,9 +1,9 @@
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
-import { KEYBOARD_LAYOUT } from '@/utils/albanian';
 import { LetterState } from '@/types/game';
 import { cn } from '@/lib/utils';
 import { Delete, CornerDownLeft } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface AlbanianKeyboardProps {
   onKeyPress: (key: string) => void;
@@ -13,6 +13,7 @@ interface AlbanianKeyboardProps {
 }
 
 export function AlbanianKeyboard({ onKeyPress, letterStates, disabled = false, className }: AlbanianKeyboardProps) {
+  const { config } = useLanguage();
   const [poppedKey, setPoppedKey] = useState<string | null>(null);
   const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
   const getKeyVariant = (key: string) => {
@@ -57,9 +58,9 @@ export function AlbanianKeyboard({ onKeyPress, letterStates, disabled = false, c
         variant={getKeyVariant(key)}
         size="sm"
         className={cn(
-          'shadow-keyboard font-semibold w-full flex-1 min-w-0 h-12 md:h-14 px-1 sm:px-2 md:px-3 text-[10px] sm:text-xs md:text-lg',
+          'shadow-keyboard font-semibold w-full flex-1 min-w-0 h-10 sm:h-12 md:h-14 px-1 sm:px-2 md:px-3 text-[9px] sm:text-xs md:text-lg',
           isSpecial && 'px-2 sm:px-3 md:px-4',
-          key.length > 1 && key !== 'ENTER' && key !== 'BACKSPACE' && 'text-[9px] xs:text-[10px] sm:text-xs',
+          key.length > 1 && key !== 'ENTER' && key !== 'BACKSPACE' && 'text-[8px] sm:text-[10px] md:text-xs',
           pressedKeys.has(key) && 'bg-primary/20 scale-105'
         )}
         onClick={handleClick}
@@ -87,14 +88,14 @@ export function AlbanianKeyboard({ onKeyPress, letterStates, disabled = false, c
   return (
     <div
       className={cn(
-        "w-full max-w-full md:max-w-3xl mx-auto px-2 py-3 sm:px-3 sm:py-4 bg-card/80 rounded-2xl backdrop-blur-sm",
+        "w-full max-w-full md:max-w-3xl mx-auto px-1 py-2 sm:px-2 sm:py-3 md:px-3 md:py-4 bg-card/80 rounded-2xl backdrop-blur-sm",
         className
       )}
       style={{ paddingBottom: 0 }}
     >
-      <div className="space-y-1">
-        {KEYBOARD_LAYOUT.map((row, rowIndex) => (
-          <div key={rowIndex} className="flex justify-center gap-1 w-full">
+      <div className="space-y-0.5 sm:space-y-1">
+        {config.keyboardLayout.map((row, rowIndex) => (
+          <div key={rowIndex} className="flex justify-center gap-0.5 sm:gap-1 w-full">
             {row.map(renderKey)}
           </div>
         ))}

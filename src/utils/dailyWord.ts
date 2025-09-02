@@ -1,4 +1,5 @@
 import { getFiveLetterTermsSync } from './dictionary';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 // Get today's date as a string (YYYY-MM-DD) in local timezone
 export function getTodayDateString(): string {
@@ -28,28 +29,38 @@ function simpleHash(str: string): number {
 }
 
 // Get the daily word based on today's date
-export function getDailyWord(): string {
+export function getDailyWord(language: string = 'albanian'): string {
   const dateStr = getTodayDateString();
-  const hash = simpleHash(dateStr);
+  const hash = simpleHash(dateStr + language); // Include language in hash for different words per language
   const terms = getFiveLetterTermsSync();
-  const pool = terms.length > 0 ? terms : ['FJALË'];
+  const fallbackWord = language === 'english' ? 'WORDS' : 'FJALË';
+  
+  // If no terms are loaded yet, return fallback
+  if (terms.length === 0) {
+    return fallbackWord;
+  }
+  
+  const pool = terms;
   const index = hash % pool.length;
-  return pool[index];
+  const selectedWord = pool[index];
+  return selectedWord;
 }
 
-export function getWordForDate(date: Date): string {
+export function getWordForDate(date: Date, language: string = 'albanian'): string {
   const dateStr = getDateString(date);
-  const hash = simpleHash(dateStr);
+  const hash = simpleHash(dateStr + language); // Include language in hash for different words per language
   const terms = getFiveLetterTermsSync();
-  const pool = terms.length > 0 ? terms : ['FJALË'];
+  const fallbackWord = language === 'english' ? 'WORDS' : 'FJALË';
+  const pool = terms.length > 0 ? terms : [fallbackWord];
   const index = hash % pool.length;
   return pool[index];
 }
 
 // Get formatted date for display
-export function getFormattedDate(): string {
+export function getFormattedDate(language: string = 'albanian'): string {
   const now = new Date();
-  return now.toLocaleDateString('sq-AL', { 
+  const locale = language === 'english' ? 'en-US' : 'sq-AL';
+  return now.toLocaleDateString(locale, { 
     weekday: 'long', 
     year: 'numeric', 
     month: 'long', 
@@ -57,8 +68,9 @@ export function getFormattedDate(): string {
   });
 }
 
-export function formatDate(date: Date): string {
-  return date.toLocaleDateString('sq-AL', {
+export function formatDate(date: Date, language: string = 'albanian'): string {
+  const locale = language === 'english' ? 'en-US' : 'sq-AL';
+  return date.toLocaleDateString(locale, {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
