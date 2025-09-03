@@ -13,23 +13,34 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Calendar, Trophy, Share2, Sparkles } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarUI } from '@/components/ui/calendar';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function Daily() {
   const { toast } = useToast();
-  const [dailyWord, setDailyWord] = useState(() => getDailyWord());
+  const { language, t, config } = useLanguage();
+  const [dailyWord, setDailyWord] = useState(() => getDailyWord(language));
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [hasPlayedToday, setHasPlayedToday] = useState(false);
   // const [showStats, setShowStats] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [isWinAnimating, setIsWinAnimating] = useState(false);
   
-  const gameId = `daily-${getTodayDateString()}`;
-  const { gameState, isRevealing, handleKeyPress, resetGame } = useWordleGame(dailyWord, gameId);
+  const gameId = `daily-${getTodayDateString()}-${language}`;
+  const { gameState, isRevealing, handleKeyPress, resetGame, invalidReason, getTargetWord } = useWordleGame(dailyWord, gameId);
+  
+  // Reload daily word only when it actually changes (e.g., language switch or new day)
+  useEffect(() => {
+    const newWord = getDailyWord(language);
+    if (newWord !== dailyWord) {
+      setDailyWord(newWord);
+      resetGame(newWord);
+    }
+  }, [language, resetGame, dailyWord]);
+  
   // Statistics removed
-
   // Check if player has already completed today's puzzle
   useEffect(() => {
-    const completedToday = localStorage.getItem(`daily-completed-${getTodayDateString()}`);
+    const completedToday = localStorage.getItem(`daily-completed-${getTodayDateString()}-${language}`);
     setHasPlayedToday(!!completedToday);
     
     // Clear old daily data if it's a new day
@@ -42,30 +53,41 @@ export default function Daily() {
       });
       markTodayAsPlayed();
     }
-  }, []);
+  }, [language]);
 
   // Handle keyboard events
   useEffect(() => {
+    if (hasPlayedToday) return; // Don't listen for keyboard events if already completed
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.metaKey || event.altKey) return;
-      
+
       const key = event.key.toUpperCase();
-      
+
       if (key === 'BACKSPACE' || key === 'DELETE') {
         handleKeyPress('BACKSPACE');
       } else if (key === 'ENTER') {
         handleKeyPress('ENTER');
-      } else if (/^[A-ZËÇGJ]$/.test(key)) {
-        handleKeyPress(key);
+      } else if (key.length === 1) {
+        const normalized = config.normalizeFunction(key);
+        if (config.alphabet.includes(normalized)) {
+          handleKeyPress(normalized);
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyPress]);
+  }, [handleKeyPress, hasPlayedToday, config]);
 
-  // Show game result and mark as completed
+  // Show invalid guess message, game result and mark as completed
   useEffect(() => {
+    if (invalidReason === 'not_in_dictionary') {
+      toast({
+        title: language === 'english' ? 'Not in word list' : 'Nuk është në listën e fjalëve',
+        description: language === 'english' ? 'Please enter a valid 5-letter word.' : 'Ju lutemi shkruani një fjalë të vlefshme me 5 shkronja.',
+      });
+    }
     if (gameState.gameStatus === 'won') {
       const attempts = gameState.currentRow + 1;
       const completionData = {
@@ -75,7 +97,7 @@ export default function Daily() {
         completed: true
       };
       
-      localStorage.setItem(`daily-completed-${getTodayDateString()}`, JSON.stringify(completionData));
+      localStorage.setItem(`daily-completed-${getTodayDateString()}-${language}`, JSON.stringify(completionData));
       setHasPlayedToday(true);
       // statistics removed
       
@@ -84,8 +106,10 @@ export default function Daily() {
       setTimeout(() => setIsWinAnimating(false), 2000);
       
       toast({
-        title: 'Urime! 🎉',
-        description: `E gjetët fjalën e sotme në ${attempts} përpjekje!`,
+        title: language === 'english' ? 'Congratulations! 🎉' : 'Urime! 🎉',
+        description: language === 'english' 
+          ? `You found today's word in ${attempts} attempts!`
+          : `E gjetët fjalën e sotme në ${attempts} përpjekje!`,
       });
     } else if (gameState.gameStatus === 'lost') {
       const completionData = {
@@ -96,16 +120,18 @@ export default function Daily() {
         completed: true
       };
       
-      localStorage.setItem(`daily-completed-${getTodayDateString()}`, JSON.stringify(completionData));
+      localStorage.setItem(`daily-completed-${getTodayDateString()}-${language}`, JSON.stringify(completionData));
       setHasPlayedToday(true);
       // statistics removed
       
       toast({
-        title: 'Më keq sot! 😅',
-        description: `Fjala e sotme ishte "${gameState.targetWord}". Kthehuni nesër për një sfidë të re!`,
+        title: language === 'english' ? 'Better luck next time! 😅' : 'Më keq sot! 😅',
+        description: language === 'english'
+          ? `Today's word was "${getTargetWord()}". Come back tomorrow for a new challenge!`
+          : `Fjala e sotme ishte "${getTargetWord()}". Kthehuni nesër për një sfidë të re!`,
       });
     }
-  }, [gameState.gameStatus, gameState.targetWord, gameState.currentRow, toast]);
+  }, [gameState.gameStatus, gameState.currentRow, invalidReason, toast, getTargetWord]);
 
   const shareResults = () => {
     const attempts = gameState.gameStatus === 'won' ? gameState.currentRow + 1 : 'X';
@@ -128,7 +154,9 @@ export default function Daily() {
       grid += '\n';
     }
 
-    const shareText = `Wordle Shqip ${getTodayDateString()}\n${attempts}/6\n\n${grid}\n#WordleShqip`;
+    const shareText = language === 'english' 
+      ? `Wordle English ${getTodayDateString()}\n${attempts}/6\n\n${grid}\n#WordleEnglish`
+      : `Wordle Shqip ${getTodayDateString()}\n${attempts}/6\n\n${grid}\n#WordleShqip`;
     
     if (navigator.share) {
       navigator.share({
@@ -137,8 +165,10 @@ export default function Daily() {
     } else {
       navigator.clipboard.writeText(shareText);
       toast({
-        title: 'U kopjua!',
-        description: 'Rezultatet u kopjuan në clipboard.',
+        title: language === 'english' ? 'Copied!' : 'U kopjua!',
+        description: language === 'english' 
+          ? 'Results copied to clipboard.'
+          : 'Rezultatet u kopjuan në clipboard.',
       });
     }
   };
@@ -146,7 +176,7 @@ export default function Daily() {
   return (
     <div className="min-h-screen h-screen bg-gradient-subtle flex flex-col overflow-hidden overscroll-none">
       <GameHeader 
-        title="Wordle Shqip - Dita"
+        title=""
         showFriendsButton={true}
         showHomeButton={true}
         onHelpClick={() => setShowHelp(true)}
@@ -165,7 +195,7 @@ export default function Daily() {
                 onSelect={(date) => {
                   if (!date) return;
                   setSelectedDate(date);
-                  const word = getWordForDate(date);
+                  const word = getWordForDate(date, language);
                   setDailyWord(word);
                   resetGame(word);
                 }}
@@ -178,20 +208,20 @@ export default function Daily() {
       />
       
       {/* Daily Info */}
-      <div className="w-full max-w-lg mx-auto px-4 mb-4">
+      <div className="w-full max-w-lg mx-auto px-2 sm:px-4 mb-2 sm:mb-4">
         <Card className="bg-card/50 backdrop-blur-sm">
-          <CardContent className="flex items-center justify-between p-4">
-            <div className="flex items-center gap-3">
-              <Calendar className="w-5 h-5 text-primary" />
+          <CardContent className="flex items-center justify-between p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
               <div>
-                <p className="font-semibold">Fjala e Sotme</p>
-                <p className="text-sm text-muted-foreground">{selectedDate ? formatDate(selectedDate) : getFormattedDate()}</p>
+                <p className="font-semibold text-sm sm:text-base">{t.todaysWord}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">{selectedDate ? formatDate(selectedDate, language) : getFormattedDate(language)}</p>
               </div>
             </div>
             {hasPlayedToday && (
-              <div className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-primary" />
-                <span className="text-sm font-medium">Përfunduar</span>
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                <span className="text-xs sm:text-sm font-medium">{t.completed}</span>
               </div>
             )}
           </CardContent>
@@ -199,53 +229,96 @@ export default function Daily() {
       </div>
       
       <main 
-        className="flex-1 flex flex-col items-center justify-start max-w-lg mx-auto w-full px-4 gap-2 touch-none"
+        className="flex-1 flex flex-col items-center justify-start max-w-lg mx-auto w-full px-2 sm:px-4 gap-1 sm:gap-2 touch-none"
         onTouchMove={(e) => e.preventDefault()}
         onWheel={(e) => e.preventDefault() as unknown as void}
       >
-        <div className="touch-none" onTouchMove={(e) => e.preventDefault()}>
-          <GameBoard 
-            gameState={gameState} 
-            revealingRow={isRevealing ? gameState.currentRow - 1 : undefined}
-          />
-        </div>
-        
-        {gameState.gameStatus !== 'playing' && (
-          <div className="mt-6 text-center space-y-4">
-            {gameState.gameStatus === 'won' && (
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <Sparkles className="w-5 h-5 text-primary" />
-                <span className="text-lg font-semibold text-primary">
-                  Përkrahje! {gameState.currentRow + 1}/6
-                </span>
-                <Sparkles className="w-5 h-5 text-primary" />
-              </div>
-            )}
+        {hasPlayedToday ? (
+          // Show completed game board when user has already played today
+          <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4">
+            <div className="mb-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-primary mb-2">
+                {language === 'english' ? 'Today\'s Word Completed!' : 'Fjala e Ditës Përfunduar!'}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {language === 'english' ? 'Here\'s how you found it:' : 'Ja si e gjetët:'}
+              </p>
+            </div>
+            
+            {/* Show the completed game board */}
+            <div className="touch-none" onTouchMove={(e) => e.preventDefault()}>
+              <GameBoard 
+                gameState={gameState} 
+                revealingRow={undefined}
+                getTargetWord={getTargetWord}
+              />
+            </div>
             
             <div className="flex gap-3">
               <Button 
                 onClick={shareResults}
                 size="lg"
-                className="flex-1"
+                className="px-6"
               >
                 <Share2 className="w-4 h-4 mr-2" />
-                Ndaj
+                {t.share}
               </Button>
-              {/* Statistics button removed */}
             </div>
             
             <p className="text-sm text-muted-foreground">
-              Kthehuni nesër për një fjalë të re!
+              {t.comeBackTomorrow}
             </p>
           </div>
+        ) : (
+          // Show active game when user hasn't played today
+          <>
+            <div className="touch-none" onTouchMove={(e) => e.preventDefault()}>
+              <GameBoard 
+                gameState={gameState} 
+                revealingRow={isRevealing ? gameState.currentRow - 1 : undefined}
+                getTargetWord={getTargetWord}
+              />
+            </div>
+            
+            {gameState.gameStatus !== 'playing' && (
+              <div className="mt-4 sm:mt-6 text-center space-y-3 sm:space-y-4">
+                {gameState.gameStatus === 'won' && (
+                  <div className="flex items-center justify-center gap-2 mb-3 sm:mb-4">
+                    <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                    <span className="text-base sm:text-lg font-semibold text-primary">
+                      {t.congratulations} {gameState.currentRow + 1}/6
+                    </span>
+                    <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                  </div>
+                )}
+                
+                <div className="flex gap-2 sm:gap-3">
+                  <Button 
+                    onClick={shareResults}
+                    size="sm"
+                    className="flex-1 sm:size-lg"
+                  >
+                    <Share2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                    {t.share}
+                  </Button>
+                </div>
+                
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  {t.comeBackTomorrow}
+                </p>
+              </div>
+            )}
+          </>
         )}
       </main>
       
-      <KeyboardOverlay
-        onKeyPress={handleKeyPress}
-        letterStates={gameState.letterStates}
-        disabled={gameState.gameStatus !== 'playing'}
-      />
+      {!hasPlayedToday && (
+        <KeyboardOverlay
+          onKeyPress={handleKeyPress}
+          letterStates={gameState.letterStates}
+          disabled={gameState.gameStatus !== 'playing'}
+        />
+      )}
       
       {/* Modals */}
       

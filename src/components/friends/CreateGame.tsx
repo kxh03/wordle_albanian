@@ -7,18 +7,16 @@ import { normalizeAlbanian, isValidAlbanianWord } from '@/utils/albanian';
 import { useToast } from '@/hooks/use-toast';
 import { Share2, Copy } from 'lucide-react';
 import { KeyboardOverlay } from '@/components/game/KeyboardOverlay';
+import { GameHeader } from '@/components/game/GameHeader';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { encryptPayload } from '@/utils/crypto';
 
 export function CreateGame() {
   const [word, setWord] = useState('');
   const [creatorName, setCreatorName] = useState('');
   const [gameLink, setGameLink] = useState('');
   const { toast } = useToast();
-  const base64UrlEncode = (input: string) => {
-    return btoa(input)
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/g, '');
-  };
+  const { config, t, language } = useLanguage();
 
   // Handle on-screen Albanian keyboard input for the word field
   const handleVirtualKey = useCallback((key: string) => {
@@ -57,13 +55,15 @@ export function CreateGame() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  const handleCreateGame = () => {
-    const normalizedWord = normalizeAlbanian(word);
+  // Note: We no longer expose raw JSON via Base64; we encrypt the payload.
+
+  const handleCreateGame = async () => {
+    const normalizedWord = config.normalizeFunction(word);
     
-    if (!isValidAlbanianWord(normalizedWord)) {
+    if (!config.isValidWordFunction(normalizedWord)) {
       toast({
-        title: 'Fjalë e pavlefshme',
-        description: 'Ju lutemi shkruani një fjalë të vlefshme shqipe me 5 shkronja.',
+        title: t.invalidWord,
+        description: t.pleaseEnterValidWord,
         variant: 'destructive'
       });
       return;
@@ -71,27 +71,28 @@ export function CreateGame() {
 
     if (!creatorName.trim()) {
       toast({
-        title: 'Emri mungon',
-        description: 'Ju lutemi shkruani emrin tuaj.',
+        title: t.nameMissing,
+        description: t.pleaseEnterName,
         variant: 'destructive'
       });
       return;
     }
 
-    // Create a self-contained base64url JSON payload so the link works without localStorage
+    // Create an encrypted self-contained payload so the link works without localStorage
     const payload = {
       word: normalizedWord,
       creatorName: creatorName.trim(),
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      language: config.code
     };
-    const gameId = base64UrlEncode(JSON.stringify(payload));
+    const gameId = await encryptPayload(payload);
     const link = `${window.location.origin}/friends/${gameId}`;
 
     setGameLink(link);
     
     toast({
-      title: 'Loja u krijua!',
-      description: 'Tani mund të ndani lidhjen me miqtë tuaj.',
+      title: t.gameCreated,
+      description: t.nowShareLink,
     });
   };
 
@@ -99,13 +100,13 @@ export function CreateGame() {
     try {
       await navigator.clipboard.writeText(gameLink);
       toast({
-        title: 'U kopjua!',
-        description: 'Lidhja u kopjua në clipboard.',
+        title: t.copied,
+        description: t.linkCopied,
       });
     } catch (err) {
       toast({
-        title: 'Gabim',
-        description: 'Nuk mundëm të kopjojmë lidhjen.',
+        title: t.error,
+        description: t.couldNotCopy,
         variant: 'destructive'
       });
     }
@@ -115,8 +116,8 @@ export function CreateGame() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `Wordle Shqip - Sfida nga ${creatorName}`,
-          text: `${creatorName} ju sfidoi në një lojë Wordle në shqip!`,
+          title: `me llafe - ${t.challengeFrom} ${creatorName}`,
+          text: `${creatorName} ${language === 'english' ? 'challenged you to a wordle game!' : 'ju sfidoi në një lojë me llafe!'}`,
           url: gameLink
         });
       } catch (err) {
@@ -128,78 +129,81 @@ export function CreateGame() {
   };
 
   return (
-    <div className="min-h-screen h-screen bg-gradient-subtle flex items-center justify-center p-4 pb-0 overflow-hidden overscroll-none">
-      <Card className="w-full max-w-md touch-none" onTouchMove={(e) => e.preventDefault()}>
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl bg-gradient-hero bg-clip-text text-transparent">
-            Krijo Lojë për Miqtë
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="word">Shkruaj një fjalë me 5 shkronja</Label>
-            <Input
-              id="word"
-              value={word}
-              onChange={() => { /* input editing disabled; use on-screen keyboard */ }}
-              maxLength={5}
-              placeholder="FJALË"
-              className="text-center text-lg font-mono"
-            />
-            {/* Inline keyboard removed to avoid duplicates */}
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="name">Emri juaj</Label>
-            <Input
-              id="name"
-              value={creatorName}
-              onChange={(e) => setCreatorName(e.target.value)}
-              placeholder="Shkruaj emrin"
-            />
-          </div>
+    <div className="min-h-screen h-screen bg-gradient-subtle flex flex-col overflow-hidden overscroll-none">
+      <GameHeader title="" showFriendsButton={false} />
 
-          {!gameLink ? (
-            <Button 
-              onClick={handleCreateGame} 
-              className="w-full"
-              disabled={word.length !== 5 || !creatorName.trim()}
-            >
-              Krijo Lojën
-            </Button>
-          ) : (
-            <div className="space-y-3">
-              <div className="p-3 bg-muted rounded-md">
-                <Label className="text-xs text-muted-foreground">Lidhja juaj:</Label>
-                <p className="text-sm font-mono break-all mt-1">{gameLink}</p>
-              </div>
-              
-              <div className="flex gap-2">
-                <Button onClick={copyToClipboard} variant="outline" className="flex-1">
-                  <Copy className="w-4 h-4 mr-2" />
-                  Kopjo
-                </Button>
-                <Button onClick={shareGame} className="flex-1">
-                  <Share2 className="w-4 h-4 mr-2" />
-                  Ndaj
-                </Button>
-              </div>
-
-              <Button 
-                onClick={() => {
-                  setWord('');
-                  setCreatorName('');
-                  setGameLink('');
-                }} 
-                variant="ghost" 
-                className="w-full"
-              >
-                Krijo tjetër lojë
-              </Button>
+      <div className="flex-1 flex items-center justify-center p-2 sm:p-4 pb-0">
+        <Card className="w-full max-w-md touch-none" onTouchMove={(e) => e.preventDefault()}>
+          <CardHeader className="text-center">
+            <CardTitle className="text-xl sm:text-2xl">
+              {t.createGameForFriends}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 sm:space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="word">{t.enterFiveLetterWord}</Label>
+              <Input
+                id="word"
+                value={word}
+                onChange={() => { /* input editing disabled; use on-screen keyboard */ }}
+                maxLength={5}
+                placeholder="FJALË"
+                className="text-center text-lg font-mono"
+              />
             </div>
-          )}
-        </CardContent>
-      </Card>
+            
+            <div className="space-y-2">
+              <Label htmlFor="name">{t.yourName}</Label>
+              <Input
+                id="name"
+                value={creatorName}
+                onChange={(e) => setCreatorName(e.target.value)}
+                placeholder={language === 'english' ? 'Enter your name' : 'Shkruaj emrin'}
+              />
+            </div>
+
+            {!gameLink ? (
+              <Button 
+                onClick={handleCreateGame} 
+                className="w-full"
+                disabled={word.length !== 5 || !creatorName.trim()}
+              >
+                {t.createGame}
+              </Button>
+            ) : (
+              <div className="space-y-3">
+                <div className="p-3 bg-muted rounded-md">
+                  <Label className="text-xs text-muted-foreground">{language === 'english' ? 'Your link:' : 'Lidhja juaj:'}</Label>
+                  <p className="text-sm font-mono break-all mt-1">{gameLink}</p>
+                </div>
+                
+                <div className="flex gap-2">
+                  <Button onClick={copyToClipboard} variant="outline" className="flex-1">
+                    <Copy className="w-4 h-4 mr-2" />
+                    {language === 'english' ? 'Copy' : 'Kopjo'}
+                  </Button>
+                  <Button onClick={shareGame} className="flex-1">
+                    <Share2 className="w-4 h-4 mr-2" />
+                    {t.share}
+                  </Button>
+                </div>
+
+                <Button 
+                  onClick={() => {
+                    setWord('');
+                    setCreatorName('');
+                    setGameLink('');
+                  }} 
+                  variant="ghost" 
+                  className="w-full"
+                >
+                  {language === 'english' ? 'Create another game' : 'Krijo tjetër lojë'}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Single bottom-fixed keyboard overlay via portal */}
       <KeyboardOverlay

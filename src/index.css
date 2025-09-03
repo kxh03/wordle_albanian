@@ -6,68 +6,61 @@
 
 @layer base {
   :root {
-    --background: 220 15% 97%;
-    --foreground: 0 0% 12%;
+    /* Brand teal #105B63 ≈ hsl(186 72% 22%) */
+    --background: 200 30% 97%;
+    --foreground: 192 40% 16%;
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 12%;
+    --card-foreground: 192 40% 16%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 12%;
+    --popover-foreground: 192 40% 16%;
 
-    /* Albanian-inspired primary (deep red from flag) */
-    --primary: 0 85% 45%;
+    --primary: 186 72% 22%;
     --primary-foreground: 0 0% 98%;
 
-    --secondary: 220 15% 94%;
-    --secondary-foreground: 0 0% 12%;
+    --secondary: 186 25% 92%;
+    --secondary-foreground: 192 40% 16%;
 
-    --muted: 220 15% 94%;
-    --muted-foreground: 0 0% 45%;
+    --muted: 186 20% 92%;
+    --muted-foreground: 192 15% 40%;
 
-    --accent: 220 15% 90%;
-    --accent-foreground: 0 0% 12%;
+    --accent: 186 25% 90%;
+    --accent-foreground: 192 40% 16%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 72% 50%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 220 13% 87%;
-    --input: 220 13% 87%;
-    --ring: 0 85% 45%;
+    --border: 186 18% 85%;
+    --input: 186 18% 85%;
+    --ring: 186 72% 22%;
 
     /* Game-specific colors */
-    --correct: 120 60% 50%;
+    --correct: 160 45% 40%; /* teal-green */
     --correct-foreground: 0 0% 100%;
-    --partial: 45 100% 50%;
+    --partial: 45 90% 48%;
     --partial-foreground: 0 0% 100%;
-    --incorrect: 0 0% 50%;
+    --incorrect: 200 8% 55%;
     --incorrect-foreground: 0 0% 100%;
     
-    /* Albanian theme gradients */
-    --gradient-hero: linear-gradient(135deg, hsl(0 85% 45%), hsl(0 70% 35%));
-    --gradient-subtle: linear-gradient(180deg, hsl(220 15% 97%), hsl(220 15% 94%));
+    /* Teal gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(186 72% 22%), hsl(186 50% 18%));
+    --gradient-subtle: linear-gradient(180deg, hsl(200 30% 97%), hsl(186 20% 94%));
     
-    /* Elegant shadows */
-    --shadow-tile: 0 2px 8px hsl(0 0% 0% / 0.1);
-    --shadow-keyboard: 0 1px 3px hsl(0 0% 0% / 0.12);
+    /* Shadows tuned for teal */
+    --shadow-tile: 0 2px 8px hsl(186 30% 20% / 0.12);
+    --shadow-keyboard: 0 1px 3px hsl(186 30% 20% / 0.18);
     
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
+    --sidebar-foreground: 190 25% 20%;
+    --sidebar-primary: 186 72% 22%;
     --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 186 20% 94%;
+    --sidebar-accent-foreground: 190 25% 20%;
+    --sidebar-border: 186 18% 85%;
+    --sidebar-ring: 186 72% 22%;
   }
 
   .dark {

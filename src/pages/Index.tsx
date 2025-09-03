@@ -1,17 +1,19 @@
 import { Button } from "@/components/ui/button";
+import { GameHeader } from "@/components/game/GameHeader";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import { Play, Users, Info, Calendar } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const Index = () => {
+  const { t } = useLanguage();
+  
   return (
     <div className="min-h-screen bg-gradient-subtle">
-      <header className="text-center py-12">
-        <h1 className="text-5xl font-bold bg-gradient-hero bg-clip-text text-transparent mb-4">
-          Wordle Shqip
-        </h1>
+      <GameHeader title="" showFriendsButton={true} />
+      <header className="text-center py-8">
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto px-4">
-          Loja e fjalëve më e dashur në botë, tani në gjuhën shqipe!
+          {t.mainTagline}
         </p>
       </header>
 
@@ -23,14 +25,14 @@ const Index = () => {
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Calendar className="w-8 h-8 text-primary" />
                 </div>
-                <CardTitle className="text-2xl">Fjala e Ditës</CardTitle>
+                <CardTitle className="text-2xl">{t.daily}</CardTitle>
               </CardHeader>
               <CardContent className="text-center">
                 <p className="text-muted-foreground mb-4">
-                  Një fjalë e re çdo ditë. E njëjta fjalë për të gjithë!
+                  {t.dailyDescription}
                 </p>
                 <Button size="lg" className="w-full">
-                  Luaj Sot
+                  {t.playToday}
                 </Button>
               </CardContent>
             </Link>
@@ -42,14 +44,14 @@ const Index = () => {
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Play className="w-8 h-8 text-primary" />
                 </div>
-                <CardTitle className="text-2xl">Lojë e Lirë</CardTitle>
+                <CardTitle className="text-2xl">{t.freeGame}</CardTitle>
               </CardHeader>
               <CardContent className="text-center">
                 <p className="text-muted-foreground mb-4">
-                  Luaj sa herë të duash me fjalë të rastësishme!
+                  {t.freeGameDescription}
                 </p>
                 <Button size="lg" variant="outline" className="w-full">
-                  Fillo Lojën
+                  {t.startGame}
                 </Button>
               </CardContent>
             </Link>
@@ -61,14 +63,14 @@ const Index = () => {
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Users className="w-8 h-8 text-primary" />
                 </div>
-                <CardTitle className="text-2xl">Sfido Miqtë</CardTitle>
+                <CardTitle className="text-2xl">{t.friends}</CardTitle>
               </CardHeader>
               <CardContent className="text-center">
                 <p className="text-muted-foreground mb-4">
-                  Krijo lojëra të personalizuara dhe sfido miqtë tuaj!
+                  {t.friendsDescription}
                 </p>
                 <Button size="lg" variant="outline" className="w-full">
-                  Krijo Lojë
+                  {t.createGameButton}
                 </Button>
               </CardContent>
             </Link>
@@ -79,7 +81,7 @@ const Index = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Info className="w-5 h-5" />
-              Si të luash
+              {t.howToPlay}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -88,9 +90,9 @@ const Index = () => {
                 <div className="w-12 h-12 bg-correct rounded-md flex items-center justify-center mx-auto mb-3 text-white font-bold text-lg">
                   A
                 </div>
-                <h3 className="font-semibold mb-2">E saktë</h3>
+                <h3 className="font-semibold mb-2">{t.correct}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Shkronja është në vendin e duhur
+                  {t.correctDescription}
                 </p>
               </div>
               
@@ -98,9 +100,9 @@ const Index = () => {
                 <div className="w-12 h-12 bg-partial rounded-md flex items-center justify-center mx-auto mb-3 text-white font-bold text-lg">
                   B
                 </div>
-                <h3 className="font-semibold mb-2">Pjesërisht</h3>
+                <h3 className="font-semibold mb-2">{t.partial}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Shkronja është në fjalë por jo në vendin e duhur
+                  {t.partialDescription}
                 </p>
               </div>
               
@@ -108,9 +110,9 @@ const Index = () => {
                 <div className="w-12 h-12 bg-incorrect rounded-md flex items-center justify-center mx-auto mb-3 text-white font-bold text-lg">
                   C
                 </div>
-                <h3 className="font-semibold mb-2">Gabim</h3>
+                <h3 className="font-semibold mb-2">{t.wrong}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Shkronja nuk është në fjalë
+                  {t.wrongDescription}
                 </p>
               </div>
             </div>
@@ -119,7 +121,7 @@ const Index = () => {
       </main>
 
       <footer className="text-center py-8 text-muted-foreground">
-        <p>© 2024 Wordle Shqip - Krijuar me ❤️ për komunitetin shqiptar</p>
+        <p>© 2025 6 Llafe</p>
       </footer>
     </div>
   );

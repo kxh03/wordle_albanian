@@ -20,4 +20,5 @@ export interface CustomGame {
   word: string;
   creatorName: string;
   createdAt: number;
+  language?: string;
 }

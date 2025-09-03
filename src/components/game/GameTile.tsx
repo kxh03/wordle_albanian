@@ -25,7 +25,8 @@ export function GameTile({ letter, state, isRevealing = false, delay = 0 }: Game
   return (
     <div 
       className={cn(
-        'w-12 h-12 sm:w-14 sm:h-14 border-2 rounded-md flex items-center justify-center font-bold text-lg sm:text-xl transition-all duration-300 shadow-tile transform',
+        // Slightly larger, higher contrast default look for better clarity in free play
+        'w-12 h-12 sm:w-14 sm:h-14 border-2 rounded-md flex items-center justify-center font-bold text-lg sm:text-xl transition-all duration-300 shadow-tile transform bg-card/70',
         getStateClasses(),
         // When a letter is typed but tile hasn't been evaluated yet, highlight it
         (state === 'unused' && letter) && 'bg-accent text-accent-foreground border-accent',

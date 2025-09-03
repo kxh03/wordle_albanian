@@ -1,24 +1,28 @@
 import { normalizeAlbanian } from './albanian';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 type DictionaryEntry = {
   term?: string;
   [key: string]: unknown;
 };
 
+type DictionaryData = {
+  words: string[];
+};
+
 let cachedTerms: string[] = [];
 let cachedSet: ReadonlySet<string> = new Set();
 let loadingPromise: Promise<void> | null = null;
+let currentLanguage: string | null = null;
 
-const extractTerms = (entries: DictionaryEntry[]): string[] => {
+const extractTerms = (data: DictionaryData, normalizeFunction: (text: string) => string): string[] => {
   const seen = new Set<string>();
   const terms: string[] = [];
 
-  for (const entry of entries) {
-    if (!entry || typeof entry.term !== 'string') continue;
-    const firstToken = entry.term.split(' ')[0];
-    if (!firstToken) continue;
-
-    const normalized = normalizeAlbanian(firstToken);
+  for (const word of data.words) {
+    if (!word || typeof word !== 'string') continue;
+    
+    const normalized = normalizeFunction(word);
     if (normalized.length !== 5) continue;
     if (seen.has(normalized)) continue;
 
@@ -33,23 +37,47 @@ export function getFiveLetterTermsSync(): string[] {
   return cachedTerms;
 }
 
-export function isValidGuess(word: string): boolean {
+export function isDictionaryReady(language?: string): boolean {
+  if (language && currentLanguage && language !== currentLanguage) return false;
+  return cachedSet.size > 0;
+}
+
+export function isValidGuess(word: string, normalizeFunction: (text: string) => string = normalizeAlbanian): boolean {
   if (!word) return false;
-  const normalized = normalizeAlbanian(word);
+  const normalized = normalizeFunction(word);
   return cachedSet.has(normalized);
 }
 
-export function ensureDictionaryLoaded(): Promise<void> {
-  if (loadingPromise) return loadingPromise;
-  loadingPromise = import('../../dictionary.json')
-    .then(mod => {
-      const entries = (mod.default || mod) as unknown as DictionaryEntry[];
-      cachedTerms = extractTerms(entries);
-      cachedSet = new Set(cachedTerms);
+export function ensureDictionaryLoaded(language: string = 'albanian', normalizeFunction: (text: string) => string = normalizeAlbanian): Promise<void> {
+  // If we already have the correct language loaded, return immediately
+  if (currentLanguage === language && cachedTerms.length > 0) {
+    return Promise.resolve();
+  }
+
+  // If we're loading the same language, return the existing promise
+  if (loadingPromise && currentLanguage === language) {
+    return loadingPromise;
+  }
+
+  const dictionaryPath = language === 'english' ? '/dictionary-en.json' : '/dictionary.json';
+  
+  loadingPromise = fetch(dictionaryPath)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`Failed to load dictionary: ${response.status}`);
+      }
+      return response.json();
     })
-    .catch(() => {
+    .then((data: DictionaryData) => {
+      cachedTerms = extractTerms(data, normalizeFunction);
+      cachedSet = new Set(cachedTerms);
+      currentLanguage = language;
+    })
+    .catch((error) => {
+      console.error(`Error loading dictionary for ${language}:`, error);
       cachedTerms = [];
       cachedSet = new Set();
+      currentLanguage = language;
     });
   return loadingPromise;
 }
