@@ -37,6 +37,11 @@ export function getFiveLetterTermsSync(): string[] {
   return cachedTerms;
 }
 
+export function isDictionaryReady(language?: string): boolean {
+  if (language && currentLanguage && language !== currentLanguage) return false;
+  return cachedSet.size > 0;
+}
+
 export function isValidGuess(word: string, normalizeFunction: (text: string) => string = normalizeAlbanian): boolean {
   if (!word) return false;
   const normalized = normalizeFunction(word);

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { GameState, LetterState } from '@/types/game';
-import { ensureDictionaryLoaded, isValidGuess } from '@/utils/dictionary';
+import { ensureDictionaryLoaded, isValidGuess, isDictionaryReady } from '@/utils/dictionary';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const ROWS = 6;
@@ -93,8 +93,14 @@ export function useWordleGame(targetWord: string, gameId?: string) {
           const normalizedGuess = config.normalizeFunction(currentGuess);
           const target = secretWordRef.current; // already normalized
           const isTargetMatch = normalizedGuess === target;
+          // Make sure dictionary is loaded before validating. If not ready, try to load and block submit this tick.
+          if (!isDictionaryReady()) {
+            // Trigger async load but do not accept guess until loaded
+            ensureDictionaryLoaded();
+            setInvalidReason('not_in_dictionary');
+            return newState;
+          }
           const isDictionaryOk = isValidGuess(normalizedGuess, config.normalizeFunction);
-          // Enforce dictionary in all modes: only allow words present in the active dictionary
           const isValid = normalizedGuess.length === COLS && (isTargetMatch || isDictionaryOk);
 
           if (isValid) {

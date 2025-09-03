@@ -17,7 +17,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function Daily() {
   const { toast } = useToast();
-  const { language, t } = useLanguage();
+  const { language, t, config } = useLanguage();
   const [dailyWord, setDailyWord] = useState(() => getDailyWord(language));
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [hasPlayedToday, setHasPlayedToday] = useState(false);
@@ -58,24 +58,27 @@ export default function Daily() {
   // Handle keyboard events
   useEffect(() => {
     if (hasPlayedToday) return; // Don't listen for keyboard events if already completed
-    
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.metaKey || event.altKey) return;
-      
+
       const key = event.key.toUpperCase();
-      
+
       if (key === 'BACKSPACE' || key === 'DELETE') {
         handleKeyPress('BACKSPACE');
       } else if (key === 'ENTER') {
         handleKeyPress('ENTER');
-      } else if (/^[A-Z]$/.test(key)) {
-        handleKeyPress(key);
+      } else if (key.length === 1) {
+        const normalized = config.normalizeFunction(key);
+        if (config.alphabet.includes(normalized)) {
+          handleKeyPress(normalized);
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyPress, hasPlayedToday]);
+  }, [handleKeyPress, hasPlayedToday, config]);
 
   // Show invalid guess message, game result and mark as completed
   useEffect(() => {

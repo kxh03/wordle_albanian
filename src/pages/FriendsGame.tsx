@@ -57,7 +57,7 @@ export default function FriendsGame() {
     });
   }, [gameId]);
 
-  const { gameState, isRevealing, handleKeyPress, resetGame } = useWordleGame(
+  const { gameState, isRevealing, handleKeyPress, resetGame, getTargetWord } = useWordleGame(
     customGame?.word || 'FJALE',
     gameId
   );
@@ -102,10 +102,10 @@ export default function FriendsGame() {
     } else if (gameState.gameStatus === 'lost') {
       toast({
         title: t.betterLuckNextTime,
-        description: `${t.theWordWas} ${customGame.creatorName} was "${gameState.targetWord}".`,
+        description: `${t.theWordWas} ${customGame.creatorName} was "${getTargetWord()}".`,
       });
     }
-  }, [gameState.gameStatus, gameState.targetWord, gameState.currentRow, customGame, toast]);
+  }, [gameState.gameStatus, gameState.currentRow, customGame, toast, getTargetWord]);
 
   if (notFound) {
     return <Navigate to="/friends" replace />;
@@ -139,6 +139,7 @@ export default function FriendsGame() {
         <GameBoard 
           gameState={gameState} 
           revealingRow={isRevealing ? gameState.currentRow - 1 : undefined}
+          getTargetWord={getTargetWord}
         />
         
         {/* Removed retry button for friends mode */}
