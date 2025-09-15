@@ -58,16 +58,16 @@ export function GameBoard({ gameState, revealingRow, getTargetWord }: GameBoardP
   };
 
   return (
-    <div className="grid grid-rows-6 gap-1 sm:gap-2 p-1 sm:p-2 md:p-4 w-full max-w-sm sm:max-w-md mx-auto">
+    <div className="grid grid-rows-6 gap-2 sm:gap-3 p-2 sm:p-3 md:p-4 w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto">
       {board.map((row, rowIndex) => (
-        <div key={rowIndex} className="grid grid-cols-5 gap-1 sm:gap-2 justify-center">
+        <div key={rowIndex} className="grid grid-cols-5 gap-2 sm:gap-3 justify-center">
           {row.map((letter, colIndex) => (
             <GameTile
               key={`${rowIndex}-${colIndex}`}
               letter={letter}
               state={getTileState(rowIndex, colIndex, letter)}
               isRevealing={gameState.gameStatus === 'playing' && revealingRow === rowIndex}
-              delay={colIndex * 100}
+              delay={colIndex * 80}
             />
           ))}
         </div>

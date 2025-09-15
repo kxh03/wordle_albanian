@@ -21,7 +21,39 @@ export function getRandomWord(): string {
 }
 
 export function normalizeAlbanian(text: string): string {
-  return text.toUpperCase().normalize('NFC').trim();
+  // First normalize and uppercase
+  let normalized = text.toUpperCase().normalize('NFC').trim();
+  
+  // Handle common Albanian character substitutions for keyboard input
+  // This allows users to type E instead of Ë, C instead of Ç, etc.
+  const substitutions: Record<string, string> = {
+    'E': 'Ë', // Allow E to match Ë in dictionary
+    'C': 'Ç'  // Allow C to match Ç in dictionary
+  };
+  
+  // For validation, we'll try both the original and substituted versions
+  return normalized;
+}
+
+// Helper function to get all possible variations of a word
+export function getAlbanianVariations(text: string): string[] {
+  const normalized = text.toUpperCase().normalize('NFC').trim();
+  const variations = [normalized];
+  
+  // Add variations with Albanian character substitutions
+  let withE = normalized.replace(/E/g, 'Ë');
+  let withC = normalized.replace(/C/g, 'Ç');
+  
+  if (withE !== normalized) variations.push(withE);
+  if (withC !== normalized) variations.push(withC);
+  
+  // Combination of both
+  let withBoth = normalized.replace(/E/g, 'Ë').replace(/C/g, 'Ç');
+  if (withBoth !== normalized && !variations.includes(withBoth)) {
+    variations.push(withBoth);
+  }
+  
+  return variations;
 }
 
 export function isValidAlbanianWord(word: string): boolean {

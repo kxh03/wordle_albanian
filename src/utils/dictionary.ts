@@ -1,12 +1,12 @@
-import { normalizeAlbanian } from './albanian';
+import { normalizeAlbanian, getAlbanianVariations } from './albanian';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 type DictionaryEntry = {
-  term?: string;
-  [key: string]: unknown;
+  term: string;
+  definition: string[];
 };
 
-type DictionaryData = {
+type DictionaryData = DictionaryEntry[] | {
   words: string[];
 };
 
@@ -19,15 +19,35 @@ const extractTerms = (data: DictionaryData, normalizeFunction: (text: string) =>
   const seen = new Set<string>();
   const terms: string[] = [];
 
-  for (const word of data.words) {
-    if (!word || typeof word !== 'string') continue;
-    
-    const normalized = normalizeFunction(word);
-    if (normalized.length !== 5) continue;
-    if (seen.has(normalized)) continue;
+  // Handle both dictionary formats
+  if (Array.isArray(data)) {
+    // New format: array of objects with term and definition
+    for (const entry of data) {
+      if (!entry.term || typeof entry.term !== 'string') continue;
+      
+      // Extract the actual word from the term (remove grammatical info)
+      const termParts = entry.term.split(' ');
+      const word = termParts[0];
+      
+      const normalized = normalizeFunction(word);
+      if (normalized.length !== 5) continue;
+      if (seen.has(normalized)) continue;
 
-    seen.add(normalized);
-    terms.push(normalized);
+      seen.add(normalized);
+      terms.push(normalized);
+    }
+  } else if (data.words) {
+    // Old format: object with words array
+    for (const word of data.words) {
+      if (!word || typeof word !== 'string') continue;
+      
+      const normalized = normalizeFunction(word);
+      if (normalized.length !== 5) continue;
+      if (seen.has(normalized)) continue;
+
+      seen.add(normalized);
+      terms.push(normalized);
+    }
   }
 
   return terms;
@@ -45,7 +65,27 @@ export function isDictionaryReady(language?: string): boolean {
 export function isValidGuess(word: string, normalizeFunction: (text: string) => string = normalizeAlbanian): boolean {
   if (!word) return false;
   const normalized = normalizeFunction(word);
-  return cachedSet.has(normalized);
+  
+  // First check the normalized version
+  if (cachedSet.has(normalized)) return true;
+  
+  // For Albanian, also check variations with special characters
+  if (normalizeFunction === normalizeAlbanian) {
+    const variations = getAlbanianVariations(word);
+    for (const variation of variations) {
+      if (cachedSet.has(variation)) return true;
+    }
+  }
+  
+  return false;
+}
+
+export function getDictionaryStatus(): { language: string | null, wordCount: number, sampleWords: string[] } {
+  return {
+    language: currentLanguage,
+    wordCount: cachedTerms.length,
+    sampleWords: cachedTerms.slice(0, 10)
+  };
 }
 
 export function ensureDictionaryLoaded(language: string = 'albanian', normalizeFunction: (text: string) => string = normalizeAlbanian): Promise<void> {
@@ -54,12 +94,37 @@ export function ensureDictionaryLoaded(language: string = 'albanian', normalizeF
     return Promise.resolve();
   }
 
-  // If we're loading the same language, return the existing promise
+  // If we're switching languages, clear the current cache and provide immediate fallbacks
+  if (currentLanguage && currentLanguage !== language) {
+    cachedTerms = [];
+    cachedSet = new Set();
+    loadingPromise = null;
+    
+    // Immediately provide real fallback words from the dictionaries
+    const fallbackWords = language === 'english' 
+      ? ['ABOUT', 'HOUSE', 'WORLD', 'MUSIC', 'HAPPY', 'LIGHT', 'HEART', 'WATER', 'PEACE', 'DREAM']
+      : ['ANDEJ', 'DIÇKA', 'KËTEJ', 'MJAFT', 'SEPSE', 'SIPËR', 'TEPËR', 'TUTJE', 'KREJT', 'PRANË'];
+    cachedTerms = fallbackWords;
+    cachedSet = new Set(fallbackWords);
+  }
+
+  // If we're already loading this language, return the existing promise
   if (loadingPromise && currentLanguage === language) {
     return loadingPromise;
   }
 
   const dictionaryPath = language === 'english' ? '/dictionary-en.json' : '/dictionary.json';
+  
+  currentLanguage = language; // Set this early to prevent race conditions
+  
+  // If we don't have any words yet, provide immediate fallbacks
+  if (cachedTerms.length === 0) {
+    const fallbackWords = language === 'english' 
+      ? ['ABOUT', 'HOUSE', 'WORLD', 'MUSIC', 'HAPPY', 'LIGHT', 'HEART', 'WATER', 'PEACE', 'DREAM']
+      : ['ANDEJ', 'DIÇKA', 'KËTEJ', 'MJAFT', 'SEPSE', 'SIPËR', 'TEPËR', 'TUTJE', 'KREJT', 'PRANË'];
+    cachedTerms = fallbackWords;
+    cachedSet = new Set(fallbackWords);
+  }
   
   loadingPromise = fetch(dictionaryPath)
     .then(response => {
@@ -69,17 +134,22 @@ export function ensureDictionaryLoaded(language: string = 'albanian', normalizeF
       return response.json();
     })
     .then((data: DictionaryData) => {
-      cachedTerms = extractTerms(data, normalizeFunction);
-      cachedSet = new Set(cachedTerms);
-      currentLanguage = language;
+      const newTerms = extractTerms(data, normalizeFunction);
+      if (newTerms.length > 0) {
+        cachedTerms = newTerms;
+        cachedSet = new Set(newTerms);
+        console.log(`Dictionary loaded for ${language}: ${cachedTerms.length} words`);
+      }
     })
     .catch((error) => {
       console.error(`Error loading dictionary for ${language}:`, error);
-      cachedTerms = [];
-      cachedSet = new Set();
-      currentLanguage = language;
+      // Keep the fallback words we already set
+    })
+    .finally(() => {
+      loadingPromise = null; // Clear the promise when done
     });
-  return loadingPromise;
+  
+  return Promise.resolve(); // Return immediately, don't wait for the fetch
 }
 
 

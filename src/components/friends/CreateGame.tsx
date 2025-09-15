@@ -10,13 +10,31 @@ import { KeyboardOverlay } from '@/components/game/KeyboardOverlay';
 import { GameHeader } from '@/components/game/GameHeader';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { encryptPayload } from '@/utils/crypto';
+import { ensureDictionaryLoaded, isValidGuess } from '@/utils/dictionary';
 
 export function CreateGame() {
   const [word, setWord] = useState('');
   const [creatorName, setCreatorName] = useState('');
   const [gameLink, setGameLink] = useState('');
+  const [isWordValid, setIsWordValid] = useState<boolean | null>(null);
   const { toast } = useToast();
   const { config, t, language } = useLanguage();
+
+  // Ensure dictionary is loaded when component mounts
+  useEffect(() => {
+    ensureDictionaryLoaded(config.code, config.normalizeFunction);
+  }, [config.code, config.normalizeFunction]);
+
+  // Validate word in real-time as user types
+  useEffect(() => {
+    if (word.length === 5) {
+      const normalizedWord = config.normalizeFunction(word);
+      const isValid = isValidGuess(normalizedWord, config.normalizeFunction);
+      setIsWordValid(isValid);
+    } else {
+      setIsWordValid(null);
+    }
+  }, [word, config]);
 
   // Handle on-screen Albanian keyboard input for the word field
   const handleVirtualKey = useCallback((key: string) => {
@@ -32,7 +50,7 @@ export function CreateGame() {
     setWord(prev => (prev.length < 5 ? (prev + key).toUpperCase() : prev));
   }, []);
 
-  // Allow only Backspace/Delete from physical keyboard on the word field
+  // Handle physical keyboard input for the word field
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       // Only affect when focused within this page
@@ -42,25 +60,40 @@ export function CreateGame() {
 
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       const key = event.key.toUpperCase();
+      
       if (key === 'BACKSPACE' || key === 'DELETE') {
-        // We manage deletion ourselves to keep state in sync
         event.preventDefault();
         setWord(prev => prev.slice(0, Math.max(0, prev.length - 1)));
-      } else {
-        // Block any other physical typing
-        event.preventDefault();
+      } else if (key.length === 1) {
+        // Allow physical keyboard typing for valid characters
+        const normalized = config.normalizeFunction(key);
+        if (config.alphabet.includes(normalized)) {
+          event.preventDefault();
+          setWord(prev => (prev.length < 5 ? (prev + normalized).toUpperCase() : prev));
+        }
       }
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [config]);
 
   // Note: We no longer expose raw JSON via Base64; we encrypt the payload.
 
   const handleCreateGame = async () => {
     const normalizedWord = config.normalizeFunction(word);
     
-    if (!config.isValidWordFunction(normalizedWord)) {
+    // First check basic word structure
+    if (normalizedWord.length !== 5) {
+      toast({
+        title: t.invalidWord,
+        description: language === 'english' ? 'Word must be exactly 5 letters.' : 'Fjala duhet të ketë saktësisht 5 shkronja.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Then check if the word exists in the dictionary
+    if (!isValidGuess(normalizedWord, config.normalizeFunction)) {
       toast({
         title: t.invalidWord,
         description: t.pleaseEnterValidWord,
@@ -142,14 +175,48 @@ export function CreateGame() {
           <CardContent className="space-y-3 sm:space-y-4">
             <div className="space-y-2">
               <Label htmlFor="word">{t.enterFiveLetterWord}</Label>
-              <Input
-                id="word"
-                value={word}
-                onChange={() => { /* input editing disabled; use on-screen keyboard */ }}
-                maxLength={5}
-                placeholder="FJALË"
-                className="text-center text-lg font-mono"
-              />
+              <div className="relative">
+                <Input
+                  id="word"
+                  value={word}
+                  onChange={(e) => {
+                    // Allow direct input changes but normalize and limit to 5 characters
+                    const value = e.target.value.toUpperCase();
+                    const normalized = config.normalizeFunction(value);
+                    setWord(normalized.slice(0, 5));
+                  }}
+                  maxLength={5}
+                  placeholder="FJALË"
+                  className={`text-center text-lg font-mono ${
+                    word.length === 5 
+                      ? isWordValid === true 
+                        ? 'border-green-500 bg-green-50' 
+                        : isWordValid === false 
+                        ? 'border-red-500 bg-red-50' 
+                        : ''
+                      : ''
+                  }`}
+                />
+                {word.length === 5 && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    {isWordValid === true ? (
+                      <span className="text-green-500 text-xl">✓</span>
+                    ) : isWordValid === false ? (
+                      <span className="text-red-500 text-xl">✗</span>
+                    ) : (
+                      <span className="text-gray-400 text-sm">...</span>
+                    )}
+                  </div>
+                )}
+              </div>
+              {word.length === 5 && isWordValid === false && (
+                <p className="text-sm text-red-600">
+                  {language === 'english' 
+                    ? 'This word is not in our dictionary. Please try another word.'
+                    : 'Kjo fjalë nuk është në fjalorën tonë. Ju lutemi provoni një fjalë tjetër.'
+                  }
+                </p>
+              )}
             </div>
             
             <div className="space-y-2">
@@ -166,7 +233,7 @@ export function CreateGame() {
               <Button 
                 onClick={handleCreateGame} 
                 className="w-full"
-                disabled={word.length !== 5 || !creatorName.trim()}
+                disabled={word.length !== 5 || !creatorName.trim() || isWordValid !== true}
               >
                 {t.createGame}
               </Button>

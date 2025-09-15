@@ -12,40 +12,60 @@ export default function Game() {
   const { toast } = useToast();
   const { t, language, config } = useLanguage();
 
-  useEffect(() => {
-    ensureDictionaryLoaded(config.code, config.normalizeFunction);
-  }, [config.code, config.normalizeFunction]);
-
   const pickRandom = () => {
     const terms = getFiveLetterTermsSync();
-    if (!terms || terms.length === 0) return language === 'english' ? 'WORDS' : 'FJALË';
+    if (!terms || terms.length === 0) {
+      // Use real fallback words from the dictionaries while full dictionary loads
+      const fallbackWords = language === 'english' 
+        ? ['ABOUT', 'HOUSE', 'WORLD', 'MUSIC', 'HAPPY', 'LIGHT', 'HEART', 'WATER', 'PEACE', 'DREAM']
+        : ['ANDEJ', 'DIÇKA', 'KËTEJ', 'MJAFT', 'SEPSE', 'SIPËR', 'TEPËR', 'TUTJE', 'KREJT', 'PRANË'];
+      return fallbackWords[Math.floor(Math.random() * fallbackWords.length)];
+    }
     return terms[Math.floor(Math.random() * terms.length)];
   };
 
   const [targetWord, setTargetWord] = useState<string>(() => pickRandom());
   const { gameState, isRevealing, handleKeyPress, resetGame, invalidReason, getTargetWord } = useWordleGame(targetWord);
 
+  // Start dictionary loading in background without blocking the UI
+  useEffect(() => {
+    // Start loading dictionary but don't wait for it
+    ensureDictionaryLoaded(config.code, config.normalizeFunction);
+  }, [config.code, config.normalizeFunction]);
+
+  // Only update word when language changes, not when dictionary loads
+  useEffect(() => {
+    const newWord = pickRandom();
+    setTargetWord(newWord);
+    resetGame(newWord);
+  }, [language]); // Only depend on language, not dictionary loading
+
   // Handle keyboard events
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Don't interfere with browser shortcuts or form inputs
       if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.target && (event.target as HTMLElement).tagName === 'INPUT') return;
       
       const key = event.key.toUpperCase();
       
       if (key === 'BACKSPACE' || key === 'DELETE') {
+        event.preventDefault();
         handleKeyPress('BACKSPACE');
       } else if (key === 'ENTER') {
+        event.preventDefault();
         handleKeyPress('ENTER');
       } else if (key.length === 1) {
         const normalized = config.normalizeFunction(key);
         if (config.alphabet.includes(normalized)) {
+          event.preventDefault();
           handleKeyPress(normalized);
         }
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyPress, config]);
 
   // Show game result
@@ -89,25 +109,29 @@ export default function Game() {
         onTouchMove={(e) => e.preventDefault()}
         onWheel={(e) => e.preventDefault() as unknown as void}
       >
-        <GameBoard 
-          gameState={gameState} 
-          revealingRow={isRevealing ? gameState.currentRow - 1 : undefined}
-          getTargetWord={getTargetWord}
-        />
+        <div className="animate-float">
+          <GameBoard 
+            gameState={gameState} 
+            revealingRow={isRevealing ? gameState.currentRow - 1 : undefined}
+            getTargetWord={getTargetWord}
+          />
+        </div>
         
         {gameState.gameStatus !== 'playing' && (
-          <div className="mt-6 text-center space-y-4">
-            <Button 
+          <div className="mt-8 text-center space-y-4 animate-bounce-in">
+            <div className="glass rounded-2xl p-6 shadow-card">
+              <Button 
                 onClick={() => {
                   const w = pickRandom();
                   setTargetWord(w);
                   resetGame(w);
                 }} 
                 size="lg"
-                className="px-8"
+                className="px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
               >
                 {t.newGame}
               </Button>
+            </div>
           </div>
         )}
       </main>

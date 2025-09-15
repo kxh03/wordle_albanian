@@ -7,6 +7,7 @@ import { KeyboardOverlay } from '@/components/game/KeyboardOverlay';
 import { useWordleGame } from '@/hooks/useWordleGame';
 // import { useGameStatistics } from '@/hooks/useGameStatistics';
 import { getDailyWord, getFormattedDate, isNewDay, markTodayAsPlayed, getTodayDateString, getWordForDate, formatDate } from '@/utils/dailyWord';
+import { ensureDictionaryLoaded } from '@/utils/dictionary';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -28,14 +29,16 @@ export default function Daily() {
   const gameId = `daily-${getTodayDateString()}-${language}`;
   const { gameState, isRevealing, handleKeyPress, resetGame, invalidReason, getTargetWord } = useWordleGame(dailyWord, gameId);
   
-  // Reload daily word only when it actually changes (e.g., language switch or new day)
+  // Handle language switching and dictionary loading
   useEffect(() => {
-    const newWord = getDailyWord(language);
-    if (newWord !== dailyWord) {
-      setDailyWord(newWord);
-      resetGame(newWord);
-    }
-  }, [language, resetGame, dailyWord]);
+    ensureDictionaryLoaded(config.code, config.normalizeFunction).then(() => {
+      const newWord = getDailyWord(language);
+      if (newWord !== dailyWord) {
+        setDailyWord(newWord);
+        resetGame(newWord);
+      }
+    });
+  }, [language, config.code, config.normalizeFunction, resetGame, dailyWord]);
   
   // Statistics removed
   // Check if player has already completed today's puzzle
@@ -60,24 +63,29 @@ export default function Daily() {
     if (hasPlayedToday) return; // Don't listen for keyboard events if already completed
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Don't interfere with browser shortcuts or form inputs
       if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.target && (event.target as HTMLElement).tagName === 'INPUT') return;
 
       const key = event.key.toUpperCase();
 
       if (key === 'BACKSPACE' || key === 'DELETE') {
+        event.preventDefault();
         handleKeyPress('BACKSPACE');
       } else if (key === 'ENTER') {
+        event.preventDefault();
         handleKeyPress('ENTER');
       } else if (key.length === 1) {
         const normalized = config.normalizeFunction(key);
         if (config.alphabet.includes(normalized)) {
+          event.preventDefault();
           handleKeyPress(normalized);
         }
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyPress, hasPlayedToday, config]);
 
   // Show invalid guess message, game result and mark as completed
