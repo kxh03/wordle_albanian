@@ -29,9 +29,24 @@ export function AlbanianKeyboard({ onKeyPress, letterStates, disabled = false, c
 
   const renderKey = (key: string) => {
     const isSpecial = key === 'ENTER' || key === 'BACKSPACE';
-    
-    const handleClick = () => {
+
+    const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
       if (disabled) return;
+
+      // Add haptic feedback for mobile devices
+      if ('vibrate' in navigator) {
+        navigator.vibrate(10); // Very short vibration
+      }
+
+      // Add press animation
+      const button = e.currentTarget;
+      button.classList.add('animate-key-press');
+
+      // Remove animation class after animation completes
+      setTimeout(() => {
+        button.classList.remove('animate-key-press');
+      }, 150);
+
       onKeyPress(key);
     };
 
@@ -43,6 +58,10 @@ export function AlbanianKeyboard({ onKeyPress, letterStates, disabled = false, c
         className={cn(
           // Enhanced keyboard styling
           'shadow-keyboard font-bold w-full flex-1 min-w-0 h-10 sm:h-12 md:h-14 px-1 sm:px-2 md:px-3 text-[10px] sm:text-sm md:text-lg relative overflow-hidden',
+          // Touch feedback for mobile - enhanced for better mobile experience
+          'active:scale-95 active:shadow-sm transition-all duration-150 ease-out touch-manipulation select-none',
+          // Better mobile tap targets
+          'min-h-[44px] sm:min-h-[48px]',
           // Special key styling
           isSpecial && 'px-2 sm:px-3 md:px-4 font-semibold',
           // Multi-character key styling
