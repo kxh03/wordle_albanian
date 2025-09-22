@@ -12,7 +12,11 @@ export function KeyboardOverlay({ onKeyPress, letterStates, disabled = false }: 
   const overlay = (
     <div
       className="fixed inset-x-0 bottom-0 z-[2147483647]"
-      style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0px)' }}
+      style={{ 
+        paddingBottom: 'max(env(safe-area-inset-bottom), 8px)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)'
+      }}
     >
       <AlbanianKeyboard
         onKeyPress={onKeyPress}

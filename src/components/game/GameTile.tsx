@@ -6,9 +6,11 @@ interface GameTileProps {
   state: LetterState;
   isRevealing?: boolean;
   delay?: number;
+  isWordComplete?: boolean;
+  wordCompleteDelay?: number;
 }
 
-export function GameTile({ letter, state, isRevealing = false, delay = 0 }: GameTileProps) {
+export function GameTile({ letter, state, isRevealing = false, delay = 0, isWordComplete = false, wordCompleteDelay = 0 }: GameTileProps) {
   const getStateClasses = () => {
     switch (state) {
       case 'correct':
@@ -34,12 +36,14 @@ export function GameTile({ letter, state, isRevealing = false, delay = 0 }: Game
         getStateClasses(),
         // Animation states
         isRevealing && 'animate-flip scale-110 z-10',
-        letter && !isRevealing && 'hover:scale-105 hover:shadow-card',
+        letter && !isRevealing && !isWordComplete && 'hover:scale-105 hover:shadow-card',
         // Add subtle floating animation for empty tiles
-        state === 'unused' && !letter && 'hover:animate-pulse-subtle'
+        state === 'unused' && !letter && 'hover:animate-pulse-subtle',
+        // Word completion color wave animation
+        isWordComplete && 'animate-word-color-wave z-20'
       )}
       style={{ 
-        animationDelay: isRevealing ? `${delay}ms` : '0ms' 
+        animationDelay: isRevealing ? `${delay}ms` : isWordComplete ? `${wordCompleteDelay}ms` : '0ms' 
       }}
     >
       {/* Subtle shine effect */}

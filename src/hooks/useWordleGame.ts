@@ -53,6 +53,7 @@ export function useWordleGame(targetWord: string, gameId?: string) {
   });
 
   const [isRevealing, setIsRevealing] = useState(false);
+  const [isWordCompleteAnimating, setIsWordCompleteAnimating] = useState(false);
   const [invalidReason, setInvalidReason] = useState<string | null>(null);
 
   const updateLetterStates = useCallback((guess: string, target: string) => {
@@ -125,7 +126,12 @@ export function useWordleGame(targetWord: string, gameId?: string) {
             
             // Trigger revealing animation
             setIsRevealing(true);
-            setTimeout(() => setIsRevealing(false), 1500);
+            setTimeout(() => {
+              setIsRevealing(false);
+              // Trigger word completion color animation after reveal
+              setIsWordCompleteAnimating(true);
+              setTimeout(() => setIsWordCompleteAnimating(false), 2500);
+            }, 1500);
             setInvalidReason(null);
           } else {
             // Signal invalid guess so UI can inform the user
@@ -175,11 +181,13 @@ export function useWordleGame(targetWord: string, gameId?: string) {
       letterStates: new Map()
     });
     setIsRevealing(false);
+    setIsWordCompleteAnimating(false);
   }, [targetWord, gameId]);
 
   return {
     gameState,
     isRevealing,
+    isWordCompleteAnimating,
     handleKeyPress,
     resetGame,
     invalidReason,

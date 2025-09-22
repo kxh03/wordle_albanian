@@ -6,9 +6,10 @@ interface GameBoardProps {
   gameState: GameState;
   revealingRow?: number;
   getTargetWord?: () => string;
+  isWordCompleteAnimating?: boolean;
 }
 
-export function GameBoard({ gameState, revealingRow, getTargetWord }: GameBoardProps) {
+export function GameBoard({ gameState, revealingRow, getTargetWord, isWordCompleteAnimating = false }: GameBoardProps) {
   const { board, letterStates } = gameState;
   const { config } = useLanguage();
 
@@ -58,9 +59,9 @@ export function GameBoard({ gameState, revealingRow, getTargetWord }: GameBoardP
   };
 
   return (
-    <div className="grid grid-rows-6 gap-2 sm:gap-3 p-2 sm:p-3 md:p-4 w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto">
+    <div className="grid grid-rows-6 gap-1.5 sm:gap-2 md:gap-3 p-1 sm:p-2 md:p-4 w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto">
       {board.map((row, rowIndex) => (
-        <div key={rowIndex} className="grid grid-cols-5 gap-2 sm:gap-3 justify-center">
+        <div key={rowIndex} className="grid grid-cols-5 gap-1.5 sm:gap-2 md:gap-3 justify-center">
           {row.map((letter, colIndex) => (
             <GameTile
               key={`${rowIndex}-${colIndex}`}
@@ -68,6 +69,8 @@ export function GameBoard({ gameState, revealingRow, getTargetWord }: GameBoardP
               state={getTileState(rowIndex, colIndex, letter)}
               isRevealing={gameState.gameStatus === 'playing' && revealingRow === rowIndex}
               delay={colIndex * 80}
+              isWordComplete={isWordCompleteAnimating && letter !== '' && rowIndex <= gameState.currentRow}
+              wordCompleteDelay={colIndex * 150}
             />
           ))}
         </div>

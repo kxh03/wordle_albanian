@@ -59,7 +59,7 @@ export default function FriendsGame() {
     });
   }, [gameId]);
 
-  const { gameState, isRevealing, handleKeyPress, resetGame, getTargetWord } = useWordleGame(
+  const { gameState, isRevealing, isWordCompleteAnimating, handleKeyPress, resetGame, getTargetWord } = useWordleGame(
     customGame?.word || 'FJALE',
     gameId
   );
@@ -140,7 +140,7 @@ export default function FriendsGame() {
   }
 
   return (
-    <div className="min-h-screen h-screen bg-gradient-subtle flex flex-col overflow-hidden overscroll-none">
+    <div className="min-h-screen h-screen bg-gradient-subtle flex flex-col overflow-hidden overscroll-none" style={{ minHeight: '100vh', height: '100vh' }}>
       <GameHeader 
         title="" 
         onReset={() => resetGame(customGame.word)}
@@ -149,36 +149,41 @@ export default function FriendsGame() {
       />
       
       <main 
-        className="flex-1 flex flex-col items-center justify-center max-w-lg mx-auto w-full px-2 sm:px-4 touch-none"
+        className="flex-1 flex flex-col items-center justify-start max-w-lg mx-auto w-full px-2 sm:px-4 py-2 sm:py-4 touch-none relative"
         onTouchMove={(e) => e.preventDefault()}
         onWheel={(e) => e.preventDefault() as unknown as void}
+        style={{ 
+          paddingBottom: '140px',
+          minHeight: 0,
+          flex: '1 1 0%'
+        }}
       >
         {/* Game completion celebration */}
         {gameState.gameStatus === 'won' && (
-          <div className="mb-4 text-center animate-victory-bounce">
-            <div className="glass rounded-2xl p-6 shadow-card animate-celebration-pulse">
-              <div className="text-5xl mb-3 animate-bounce">🎉</div>
-              <h2 className="text-2xl font-bold text-correct mb-2">
+          <div className="mb-3 sm:mb-4 text-center animate-victory-bounce w-full max-w-sm mx-auto">
+            <div className="glass rounded-2xl p-4 sm:p-6 shadow-card animate-celebration-pulse relative">
+              <div className="text-4xl sm:text-5xl mb-2 sm:mb-3 animate-bounce">🎉</div>
+              <h2 className="text-xl sm:text-2xl font-bold text-correct mb-1 sm:mb-2">
                 {t.youWon}
               </h2>
-              <p className="text-base text-muted-foreground">
+              <p className="text-sm sm:text-base text-muted-foreground">
                 {t.youGuessedWord} {customGame.creatorName}!
               </p>
               {/* Confetti effect */}
               <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
-                <div className="absolute top-0 left-1/4 w-2 h-2 bg-yellow-400 rounded-full animate-confetti" style={{ animationDelay: '0s' }}></div>
-                <div className="absolute top-0 left-1/2 w-2 h-2 bg-green-400 rounded-full animate-confetti" style={{ animationDelay: '0.2s' }}></div>
-                <div className="absolute top-0 left-3/4 w-2 h-2 bg-blue-400 rounded-full animate-confetti" style={{ animationDelay: '0.4s' }}></div>
-                <div className="absolute top-0 left-1/3 w-2 h-2 bg-red-400 rounded-full animate-confetti" style={{ animationDelay: '0.6s' }}></div>
-                <div className="absolute top-0 left-2/3 w-2 h-2 bg-purple-400 rounded-full animate-confetti" style={{ animationDelay: '0.8s' }}></div>
+                <div className="absolute top-0 left-1/4 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-yellow-400 rounded-full animate-confetti" style={{ animationDelay: '0s' }}></div>
+                <div className="absolute top-0 left-1/2 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-400 rounded-full animate-confetti" style={{ animationDelay: '0.2s' }}></div>
+                <div className="absolute top-0 left-3/4 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-400 rounded-full animate-confetti" style={{ animationDelay: '0.4s' }}></div>
+                <div className="absolute top-0 left-1/3 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-red-400 rounded-full animate-confetti" style={{ animationDelay: '0.6s' }}></div>
+                <div className="absolute top-0 left-2/3 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-purple-400 rounded-full animate-confetti" style={{ animationDelay: '0.8s' }}></div>
               </div>
             </div>
           </div>
         )}
 
         {gameState.gameStatus === 'lost' && (
-          <div className="mb-4 text-center animate-bounce-in">
-            <div className="glass rounded-2xl p-5 shadow-card">
+          <div className="mb-3 sm:mb-4 text-center animate-bounce-in">
+            <div className="glass rounded-2xl p-4 sm:p-5 shadow-card">
               <div className="text-4xl mb-3">😅</div>
               <h2 className="text-xl font-bold text-primary mb-2">
                 {t.betterLuckNextTime}
@@ -190,11 +195,12 @@ export default function FriendsGame() {
           </div>
         )}
 
-        <div className={gameState.gameStatus === 'playing' ? 'animate-float' : ''}>
+        <div className={`mt-2 sm:mt-4 mb-6 sm:mb-8 ${gameState.gameStatus === 'playing' ? 'animate-float' : ''}`}>
           <GameBoard 
             gameState={gameState} 
             revealingRow={isRevealing ? gameState.currentRow - 1 : undefined}
             getTargetWord={getTargetWord}
+            isWordCompleteAnimating={isWordCompleteAnimating}
           />
         </div>
 

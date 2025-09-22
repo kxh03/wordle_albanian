@@ -34,12 +34,12 @@ export function getDailyWord(language: string = 'albanian'): string {
   const hash = simpleHash(dateStr + language); // Include language in hash for different words per language
   const terms = getFiveLetterTermsSync();
   const fallbackWord = language === 'english' ? 'WORDS' : 'FJALË';
-  
+
   // If no terms are loaded yet, return fallback
   if (terms.length === 0) {
     return fallbackWord;
   }
-  
+
   const pool = terms;
   const index = hash % pool.length;
   const selectedWord = pool[index];
@@ -60,11 +60,11 @@ export function getWordForDate(date: Date, language: string = 'albanian'): strin
 export function getFormattedDate(language: string = 'albanian'): string {
   const now = new Date();
   const locale = language === 'english' ? 'en-US' : 'sq-AL';
-  return now.toLocaleDateString(locale, { 
-    weekday: 'long', 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
+  return now.toLocaleDateString(locale, {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
   });
 }
 

@@ -115,6 +115,22 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Mobile viewport fixes */
+  html, body {
+    height: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Fix for mobile viewport height issues */
+  @supports (-webkit-touch-callout: none) {
+    .min-h-screen {
+      min-height: -webkit-fill-available;
+    }
+    .h-screen {
+      height: -webkit-fill-available;
+    }
+  }
 }
 
 /* Enhanced animations for the game */
@@ -307,6 +323,50 @@
 
 .animate-confetti {
   animation: confetti-fall 3s linear infinite;
+}
+
+/* Word completion color animation - enhanced visibility */
+@keyframes word-color-wave {
+  0% { 
+    background: var(--gradient-tile);
+    transform: scale(1);
+    box-shadow: var(--shadow-tile);
+    border-color: hsl(var(--border));
+  }
+  20% { 
+    background: linear-gradient(135deg, hsl(142 76% 36%) 0%, hsl(142 76% 46%) 100%);
+    transform: scale(1.15);
+    box-shadow: 0 8px 25px hsl(142 76% 36% / 0.4), 0 4px 12px hsl(142 76% 36% / 0.3);
+    border-color: hsl(142 76% 46%);
+  }
+  40% { 
+    background: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(217 91% 70%) 100%);
+    transform: scale(1.2);
+    box-shadow: 0 8px 25px hsl(217 91% 60% / 0.4), 0 4px 12px hsl(217 91% 60% / 0.3);
+    border-color: hsl(217 91% 70%);
+  }
+  60% { 
+    background: linear-gradient(135deg, hsl(262 83% 58%) 0%, hsl(262 83% 68%) 100%);
+    transform: scale(1.15);
+    box-shadow: 0 8px 25px hsl(262 83% 58% / 0.4), 0 4px 12px hsl(262 83% 58% / 0.3);
+    border-color: hsl(262 83% 68%);
+  }
+  80% { 
+    background: linear-gradient(135deg, hsl(24 95% 53%) 0%, hsl(24 95% 63%) 100%);
+    transform: scale(1.1);
+    box-shadow: 0 8px 25px hsl(24 95% 53% / 0.4), 0 4px 12px hsl(24 95% 53% / 0.3);
+    border-color: hsl(24 95% 63%);
+  }
+  100% { 
+    background: var(--gradient-tile);
+    transform: scale(1);
+    box-shadow: var(--shadow-tile);
+    border-color: hsl(var(--border));
+  }
+}
+
+.animate-word-color-wave {
+  animation: word-color-wave 2.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Beautiful background patterns */
