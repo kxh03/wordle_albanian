@@ -255,7 +255,7 @@ export default function Daily() {
             </div>
             
             {/* Show the completed game board */}
-            <div className="touch-none mt-2 sm:mt-4 mb-6 sm:mb-8" onTouchMove={(e) => e.preventDefault()}>
+            <div className="touch-none mt-2 sm:mt-4 mb-6 sm:mb-2" onTouchMove={(e) => e.preventDefault()}>
               <GameBoard 
                 gameState={gameState} 
                 revealingRow={undefined}
@@ -263,6 +263,20 @@ export default function Daily() {
                 isWordCompleteAnimating={isWordCompleteAnimating}
               />
             </div>
+
+            {gameState.gameStatus === 'lost' && (
+              <div className="mb-6 text-center">
+                <div className="glass rounded-2xl p-4 sm:p-5 shadow-card">
+                  <div className="text-4xl mb-3">😅</div>
+                  <h2 className="text-lg sm:text-xl font-bold text-primary mb-1">
+                    {language === 'english' ? 'You did not find today\'s word.' : 'Nuk e gjetët fjalën e ditës.'}
+                  </h2>
+                  <p className="text-sm sm:text-base text-muted-foreground">
+                    {language === 'english' ? 'Today\'s word was' : 'Fjala e sotme ishte'} "<span className="font-bold text-primary">{getTargetWord()}</span>"
+                  </p>
+                </div>
+              </div>
+            )}
             
             <div className="flex gap-3">
               <Button 

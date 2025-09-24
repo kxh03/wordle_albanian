@@ -28,23 +28,23 @@ export function GameTile({ letter, state, isRevealing = false, delay = 0, isWord
     <div 
       className={cn(
         // Enhanced tile design with beautiful gradients and shadows
-        'w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 border-2 rounded-lg flex items-center justify-center font-bold text-lg sm:text-xl md:text-2xl transition-all duration-300 shadow-tile transform relative overflow-hidden',
+        'w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 border-2 rounded-lg flex items-center justify-center font-bold text-lg sm:text-xl md:text-2xl transition-none shadow-tile transform relative overflow-hidden',
         // Default state with gradient background
         state === 'unused' && !letter && 'bg-gradient-tile border-border hover:border-accent hover:shadow-card',
         // Typed letter state
         state === 'unused' && letter && 'bg-gradient-to-br from-accent to-accent/80 text-accent-foreground border-accent shadow-card scale-105',
         getStateClasses(),
         // Animation states
-        isRevealing && 'animate-flip scale-110 z-10',
+        // Disable reveal flip animation
+        false,
         letter && !isRevealing && !isWordComplete && 'hover:scale-105 hover:shadow-card',
         // Add subtle floating animation for empty tiles
         state === 'unused' && !letter && 'hover:animate-pulse-subtle',
         // Word completion color wave animation
-        isWordComplete && 'animate-word-color-wave z-20'
+        // Disabled word completion color wave
+        false
       )}
-      style={{ 
-        animationDelay: isRevealing ? `${delay}ms` : isWordComplete ? `${wordCompleteDelay}ms` : '0ms' 
-      }}
+      
     >
       {/* Subtle shine effect */}
       <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300 rounded-lg" />
