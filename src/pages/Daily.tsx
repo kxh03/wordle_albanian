@@ -201,7 +201,7 @@ export default function Daily() {
   };
 
   return (
-    <div className="min-h-screen h-screen bg-gradient-subtle flex flex-col overflow-hidden overscroll-none" style={{ minHeight: '100vh', height: '100vh' }}>
+    <div className="min-h-screen bg-gradient-subtle flex flex-col overflow-y-auto" style={{ minHeight: '100vh' }}>
       <GameHeader 
         title=""
         showFriendsButton={true}
@@ -256,9 +256,7 @@ export default function Daily() {
       </div>
       
       <main 
-        className="flex-1 flex flex-col items-center justify-start max-w-lg mx-auto w-full px-2 sm:px-4 py-2 sm:py-4 gap-1 sm:gap-2 touch-none"
-        onTouchMove={(e) => e.preventDefault()}
-        onWheel={(e) => e.preventDefault() as unknown as void}
+        className="flex-1 flex flex-col items-center justify-start max-w-lg mx-auto w-full px-2 sm:px-4 py-2 sm:py-4 gap-1 sm:gap-2"
         style={{ paddingBottom: '140px' }}
       >
         {hasPlayedToday ? (
@@ -274,7 +272,7 @@ export default function Daily() {
             </div>
             
             {/* Show the completed game board */}
-            <div className="touch-none mt-2 sm:mt-4 mb-6 sm:mb-2" onTouchMove={(e) => e.preventDefault()}>
+            <div className="mt-2 sm:mt-4 mb-6 sm:mb-2">
               <GameBoard 
                 gameState={gameState} 
                 revealingRow={undefined}
@@ -315,7 +313,7 @@ export default function Daily() {
         ) : (
           // Show active game when user hasn't played today
           <>
-            <div className="touch-none mt-2 sm:mt-4 mb-6 sm:mb-8" onTouchMove={(e) => e.preventDefault()}>
+            <div className="mt-2 sm:mt-4 mb-6 sm:mb-8">
               <GameBoard 
                 gameState={gameState} 
                 revealingRow={isRevealing ? gameState.currentRow - 1 : undefined}

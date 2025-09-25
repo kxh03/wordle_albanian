@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { GameBoard } from '@/components/game/GameBoard';
-import { AlbanianKeyboard } from '@/components/game/AlbanianKeyboard';
+import { KeyboardOverlay } from '@/components/game/KeyboardOverlay';
 import { GameHeader } from '@/components/game/GameHeader';
 import { useWordleGame } from '@/hooks/useWordleGame';
 import { ensureDictionaryLoaded, getFiveLetterTermsSync } from '@/utils/dictionary';
@@ -115,7 +115,7 @@ export default function Game() {
   }, [gameState.gameStatus, gameState.currentRow, invalidReason, toast, getTargetWord]);
 
   return (
-    <div className="min-h-screen h-screen bg-gradient-subtle flex flex-col overflow-hidden overscroll-none" style={{ minHeight: '100vh', height: '100vh' }}>
+    <div className="min-h-screen bg-gradient-subtle flex flex-col overflow-y-auto" style={{ minHeight: '100vh' }}>
       <GameHeader 
         title="" 
         onReset={() => {
@@ -126,9 +126,7 @@ export default function Game() {
       />
       
       <main 
-        className="flex-1 flex flex-col items-center justify-start max-w-lg mx-auto w-full px-2 sm:px-4 py-2 sm:py-4 touch-none"
-        onTouchMove={(e) => e.preventDefault()}
-        onWheel={(e) => e.preventDefault() as unknown as void}
+        className="flex-1 flex flex-col items-center justify-start max-w-lg mx-auto w-full px-2 sm:px-4 py-2 sm:py-4"
         style={{ paddingBottom: '140px' }}
       >
         <div className="animate-float mt-2 sm:mt-4 mb-6 sm:mb-8">
@@ -173,13 +171,11 @@ export default function Game() {
         )}
       </main>
       
-      <div className="pb-6">
-        <AlbanianKeyboard
-          onKeyPress={handleKeyPress}
-          letterStates={gameState.letterStates}
-          disabled={gameState.gameStatus !== 'playing'}
-        />
-      </div>
+      <KeyboardOverlay
+        onKeyPress={handleKeyPress}
+        letterStates={gameState.letterStates}
+        disabled={gameState.gameStatus !== 'playing'}
+      />
     </div>
   );
 }
