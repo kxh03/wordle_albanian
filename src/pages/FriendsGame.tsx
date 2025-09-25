@@ -15,7 +15,7 @@ import { Share2, RotateCcw } from 'lucide-react';
 
 export default function FriendsGame() {
   const { gameId } = useParams();
-  const { toast } = useToast();
+  const { toast, dismiss } = useToast();
   const { t } = useLanguage();
   const [customGame, setCustomGame] = useState<CustomGame | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -148,8 +148,11 @@ export default function FriendsGame() {
         title: customGame.language === 'english' ? 'Not in word list' : 'Nuk është në listën e fjalëve',
         description: customGame.language === 'english' ? 'Please enter a valid 5-letter word.' : 'Ju lutemi shkruani një fjalë të vlefshme me 5 shkronja.'
       });
+    } else if (invalidReason === null) {
+      // Dismiss any existing toasts when invalid reason is cleared
+      dismiss();
     }
-  }, [invalidReason, customGame, toast]);
+  }, [invalidReason, customGame, toast, dismiss]);
 
   if (notFound) {
     return <Navigate to="/friends" replace />;
