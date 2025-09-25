@@ -59,7 +59,7 @@ export default function FriendsGame() {
     });
   }, [gameId]);
 
-  const { gameState, isRevealing, isWordCompleteAnimating, handleKeyPress, resetGame, getTargetWord } = useWordleGame(
+  const { gameState, isRevealing, isWordCompleteAnimating, handleKeyPress, resetGame, getTargetWord, invalidReason } = useWordleGame(
     customGame?.word || 'FJALE',
     gameId
   );
@@ -71,13 +71,18 @@ export default function FriendsGame() {
     }
   }, [customGame?.word, resetGame]);
 
-  // Handle keyboard events - allow full keyboard input for friends games too
+  // Handle keyboard events - allow full keyboard input for friends games too (incl. Alt-code/IME letters)
   useEffect(() => {
     if (!customGame) return;
 
+    const gameLanguage = customGame.language || 'albanian';
+    const languageConfig = gameLanguage === 'english' ? 
+      { alphabet: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'], normalizeFunction: (text: string) => text.toUpperCase().trim() } :
+      { alphabet: ['A', 'B', 'C', 'Ç', 'D', 'DH', 'E', 'Ë', 'F', 'G', 'GJ', 'H', 'I', 'J', 'K', 'L', 'LL', 'M', 'N', 'NJ', 'O', 'P', 'Q', 'R', 'RR', 'S', 'SH', 'T', 'TH', 'U', 'V', 'X', 'XH', 'Y', 'Z', 'ZH'], normalizeFunction: (text: string) => text.toUpperCase().normalize('NFC').trim() };
+
     const handleKeyDown = (event: KeyboardEvent) => {
       // Don't interfere with browser shortcuts or form inputs
-      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.ctrlKey || event.metaKey) return;
       if (event.target && (event.target as HTMLElement).tagName === 'INPUT') return;
       
       const key = event.key.toUpperCase();
@@ -88,13 +93,20 @@ export default function FriendsGame() {
       } else if (key === 'ENTER') {
         event.preventDefault();
         handleKeyPress('ENTER');
-      } else if (key.length === 1) {
-        // For friends games, we need to determine the language from the game
-        const gameLanguage = customGame.language || 'albanian';
-        const languageConfig = gameLanguage === 'english' ? 
-          { alphabet: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'], normalizeFunction: (text: string) => text.toUpperCase().trim() } :
-          { alphabet: ['A', 'B', 'C', 'Ç', 'D', 'DH', 'E', 'Ë', 'F', 'G', 'GJ', 'H', 'I', 'J', 'K', 'L', 'LL', 'M', 'N', 'NJ', 'O', 'P', 'Q', 'R', 'RR', 'S', 'SH', 'T', 'TH', 'U', 'V', 'X', 'XH', 'Y', 'Z', 'ZH'], normalizeFunction: (text: string) => text.toUpperCase().normalize('NFC').trim() };
-        
+      } else if (key.length === 1 && !event.altKey) {
+        const normalized = languageConfig.normalizeFunction(key);
+        if (languageConfig.alphabet.includes(normalized)) {
+          event.preventDefault();
+          handleKeyPress(normalized);
+        }
+      }
+    };
+
+    const handleKeyPressEvent = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey) return;
+      if (event.target && (event.target as HTMLElement).tagName === 'INPUT') return;
+      const key = event.key;
+      if (key && key.length === 1) {
         const normalized = languageConfig.normalizeFunction(key);
         if (languageConfig.alphabet.includes(normalized)) {
           event.preventDefault();
@@ -104,7 +116,11 @@ export default function FriendsGame() {
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener('keypress', handleKeyPressEvent);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keypress', handleKeyPressEvent);
+    };
   }, [handleKeyPress, customGame]);
 
   // Show game result
@@ -124,6 +140,17 @@ export default function FriendsGame() {
     }
   }, [gameState.gameStatus, gameState.currentRow, customGame, toast, getTargetWord]);
 
+  // Show invalid guess alert immediately
+  useEffect(() => {
+    if (!customGame) return;
+    if (invalidReason === 'not_in_dictionary') {
+      toast({
+        title: customGame.language === 'english' ? 'Not in word list' : 'Nuk është në listën e fjalëve',
+        description: customGame.language === 'english' ? 'Please enter a valid 5-letter word.' : 'Ju lutemi shkruani një fjalë të vlefshme me 5 shkronja.'
+      });
+    }
+  }, [invalidReason, customGame, toast]);
+
   if (notFound) {
     return <Navigate to="/friends" replace />;
   }
@@ -140,7 +167,7 @@ export default function FriendsGame() {
   }
 
   return (
-    <div className="min-h-screen h-screen bg-gradient-subtle flex flex-col overflow-hidden overscroll-none" style={{ minHeight: '100vh', height: '100vh' }}>
+    <div className="min-h-screen h-screen bg-gradient-subtle flex flex-col overflow-y-auto overscroll-contain" style={{ minHeight: '100vh', height: '100vh' }}>
       <GameHeader 
         title="" 
         onReset={() => resetGame(customGame.word)}
@@ -149,14 +176,8 @@ export default function FriendsGame() {
       />
       
       <main 
-        className="flex-1 flex flex-col items-center justify-start max-w-lg mx-auto w-full px-2 sm:px-4 py-2 sm:py-4 touch-none relative"
-        onTouchMove={(e) => e.preventDefault()}
-        onWheel={(e) => e.preventDefault() as unknown as void}
-        style={{ 
-          paddingBottom: '140px',
-          minHeight: 0,
-          flex: '1 1 0%'
-        }}
+        className="flex-1 flex flex-col items-center justify-start max-w-lg mx-auto w-full px-2 sm:px-4 py-2 sm:py-4 relative"
+        style={{ paddingBottom: 'clamp(180px, 32vh, 300px)' }}
       >
         {/* Game completion celebration */}
         {gameState.gameStatus === 'won' && (

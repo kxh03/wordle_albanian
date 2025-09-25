@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function Game() {
-  const { toast } = useToast();
+  const { toast, dismiss } = useToast();
   const { t, language, config } = useLanguage();
 
   const pickRandom = () => {
@@ -44,18 +44,32 @@ export default function Game() {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Don't interfere with browser shortcuts or form inputs
-      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.ctrlKey || event.metaKey) return;
       if (event.target && (event.target as HTMLElement).tagName === 'INPUT') return;
-      
+
       const key = event.key.toUpperCase();
-      
+
       if (key === 'BACKSPACE' || key === 'DELETE') {
         event.preventDefault();
         handleKeyPress('BACKSPACE');
       } else if (key === 'ENTER') {
         event.preventDefault();
         handleKeyPress('ENTER');
-      } else if (key.length === 1) {
+      } else if (key.length === 1 && !event.altKey) {
+        const normalized = config.normalizeFunction(key);
+        if (config.alphabet.includes(normalized)) {
+          event.preventDefault();
+          handleKeyPress(normalized);
+        }
+      }
+    };
+
+    // Capture printable characters as they are produced by the OS/IME (e.g., Alt codes)
+    const handleKeyPressEvent = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey) return;
+      if (event.target && (event.target as HTMLElement).tagName === 'INPUT') return;
+      const key = event.key;
+      if (key && key.length === 1) {
         const normalized = config.normalizeFunction(key);
         if (config.alphabet.includes(normalized)) {
           event.preventDefault();
@@ -65,7 +79,11 @@ export default function Game() {
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener('keypress', handleKeyPressEvent);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keypress', handleKeyPressEvent);
+    };
   }, [handleKeyPress, config]);
 
   // Show game result
@@ -75,6 +93,9 @@ export default function Game() {
         title: language === 'english' ? 'Not in word list' : 'Nuk është në listën e fjalëve',
         description: language === 'english' ? 'Please enter a valid 5-letter word.' : 'Ju lutemi shkruani një fjalë të vlefshme me 5 shkronja.',
       });
+    } else if (invalidReason === null) {
+      // Dismiss any existing toasts when invalid reason is cleared
+      dismiss();
     }
     if (gameState.gameStatus === 'won') {
       toast({

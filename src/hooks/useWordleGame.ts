@@ -78,6 +78,11 @@ export function useWordleGame(targetWord: string, gameId?: string) {
   const handleKeyPress = useCallback((key: string) => {
     if (gameState.gameStatus !== 'playing' || isRevealing) return;
 
+    // Clear invalid message when user starts editing with backspace
+    if (key === 'BACKSPACE' && invalidReason) {
+      setInvalidReason(null);
+    }
+
     setGameState(prevState => {
       const newState = { ...prevState };
       
@@ -142,6 +147,23 @@ export function useWordleGame(targetWord: string, gameId?: string) {
         const normKey = config.normalizeFunction(key);
         newState.board[newState.currentRow][newState.currentCol] = normKey;
         newState.currentCol++;
+
+        // If row is now complete, pre-validate immediately and signal invalid
+        if (newState.currentCol === COLS) {
+          const currentGuess = newState.board[newState.currentRow].join('');
+          const normalizedGuess = config.normalizeFunction(currentGuess);
+          const target = secretWordRef.current; // normalized
+
+          if (isDictionaryReady()) {
+            const isTargetMatch = normalizedGuess === target;
+            const isDictionaryOk = isValidGuess(normalizedGuess, config.normalizeFunction);
+            const isValid = isTargetMatch || isDictionaryOk;
+            setInvalidReason(isValid ? null : 'not_in_dictionary');
+          }
+        } else {
+          // Clear invalid message while typing before reaching 5 letters
+          if (invalidReason) setInvalidReason(null);
+        }
       }
       
       // Save game state (excluding target word) only for persistent games
@@ -160,7 +182,7 @@ export function useWordleGame(targetWord: string, gameId?: string) {
       
       return newState;
     });
-  }, [gameState.gameStatus, gameState.letterStates, isRevealing, updateLetterStates, gameId]);
+  }, [gameState.gameStatus, gameState.letterStates, isRevealing, updateLetterStates, gameId, invalidReason]);
 
   const resetGame = useCallback((newTargetWord?: string) => {
     const normalized = config.normalizeFunction(newTargetWord || targetWord);
