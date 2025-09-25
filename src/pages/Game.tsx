@@ -140,6 +140,20 @@ export default function Game() {
           />
         </div>
         
+        {gameState.gameStatus === 'lost' && (
+          <div className="mb-6 text-center">
+            <div className="glass rounded-2xl p-4 sm:p-5 shadow-card">
+              <div className="text-4xl mb-3">😅</div>
+              <h2 className="text-lg sm:text-xl font-bold text-primary mb-1">
+                {language === 'english' ? 'Better luck next time!' : 'Më keq këtë herë!'}
+              </h2>
+              <p className="text-sm sm:text-base text-muted-foreground">
+                {language === 'english' ? 'The word was' : 'Fjala ishte'} "<span className="font-bold text-primary">{getTargetWord()}</span>"
+              </p>
+            </div>
+          </div>
+        )}
+        
         {gameState.gameStatus !== 'playing' && (
           <div className="mt-8 text-center space-y-4 animate-bounce-in">
             <div className="glass rounded-2xl p-6 shadow-card">
