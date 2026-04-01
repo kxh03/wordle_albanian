@@ -1,6 +1,3 @@
-import { getFiveLetterTermsSync } from './dictionary';
-import { useLanguage } from '@/contexts/LanguageContext';
-
 // Get today's date as a string (YYYY-MM-DD) in local timezone
 export function getTodayDateString(): string {
   const now = new Date();
@@ -17,45 +14,6 @@ export function getDateString(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-// Simple hash function to convert date string to number
-function simpleHash(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-  return Math.abs(hash);
-}
-
-// Get the daily word based on today's date
-export function getDailyWord(language: string = 'albanian'): string {
-  const dateStr = getTodayDateString();
-  const hash = simpleHash(dateStr + language); // Include language in hash for different words per language
-  const terms = getFiveLetterTermsSync();
-  const fallbackWord = language === 'english' ? 'WORDS' : 'FJALË';
-
-  // If no terms are loaded yet, return fallback
-  if (terms.length === 0) {
-    return fallbackWord;
-  }
-
-  const pool = terms;
-  const index = hash % pool.length;
-  const selectedWord = pool[index];
-  return selectedWord;
-}
-
-export function getWordForDate(date: Date, language: string = 'albanian'): string {
-  const dateStr = getDateString(date);
-  const hash = simpleHash(dateStr + language); // Include language in hash for different words per language
-  const terms = getFiveLetterTermsSync();
-  const fallbackWord = language === 'english' ? 'WORDS' : 'FJALË';
-  const pool = terms.length > 0 ? terms : [fallbackWord];
-  const index = hash % pool.length;
-  return pool[index];
-}
-
 // Get formatted date for display
 export function getFormattedDate(language: string = 'albanian'): string {
   const now = new Date();
@@ -64,7 +22,7 @@ export function getFormattedDate(language: string = 'albanian'): string {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
-    day: 'numeric'
+    day: 'numeric',
   });
 }
 
@@ -74,7 +32,7 @@ export function formatDate(date: Date, language: string = 'albanian'): string {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
-    day: 'numeric'
+    day: 'numeric',
   });
 }
 

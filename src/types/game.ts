@@ -4,8 +4,9 @@ export interface GameState {
   currentCol: number;
   gameStatus: 'playing' | 'won' | 'lost';
   guesses: string[];
-  targetWord: string;
   letterStates: Map<string, LetterState>;
+  /** When set (API mode), tile colors come from server per row */
+  rowFeedback?: LetterState[][];
 }
 
 export type LetterState = 'correct' | 'partial' | 'incorrect' | 'unused';

@@ -8,7 +8,6 @@ export interface LanguageConfig {
   alphabet: string[];
   normalizeFunction: (text: string) => string;
   isValidWordFunction: (word: string) => boolean;
-  dictionaryPath: string;
 }
 
 export interface Translations {

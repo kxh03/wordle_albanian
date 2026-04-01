@@ -1,54 +1,102 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { GameState, LetterState } from '@/types/game';
-import { ensureDictionaryLoaded, isValidGuess, isDictionaryReady } from '@/utils/dictionary';
 import { useLanguage } from '@/contexts/LanguageContext';
+import {
+  postDictionaryValidate,
+  postGamesSubmit,
+  type ApiLanguage,
+  type SubmitGuessResponse,
+} from '@/lib/api';
+import { normalizeForWordleMatch } from '@/utils/wordleNormalize';
 
 const ROWS = 6;
 const COLS = 5;
 
-export function useWordleGame(targetWord: string, gameId?: string) {
+export type WordleGameOptions = {
+  mode: 'local' | 'api';
+  apiLanguage: ApiLanguage;
+  targetToken?: string | null;
+  validateGuess?: (guess: string) => Promise<boolean>;
+};
+
+function mergeLetterStatesFromFeedback(
+  prev: Map<string, LetterState>,
+  guess: string,
+  feedback: LetterState[]
+): Map<string, LetterState> {
+  const next = new Map(prev);
+  const rank: Record<LetterState, number> = {
+    unused: -1,
+    incorrect: 0,
+    partial: 1,
+    correct: 2,
+  };
+  for (let i = 0; i < guess.length; i++) {
+    const letter = guess[i];
+    const state = feedback[i];
+    const old = next.get(letter) ?? 'unused';
+    if (rank[state] >= rank[old]) {
+      next.set(letter, state);
+    }
+  }
+  return next;
+}
+
+function mapApiRow(result: SubmitGuessResponse['result']): LetterState[] {
+  return result.map((r) => {
+    if (r === 'correct' || r === 'partial' || r === 'incorrect') return r;
+    return 'incorrect';
+  });
+}
+
+export function useWordleGame(
+  targetWord: string,
+  gameId?: string,
+  options?: WordleGameOptions
+) {
   const { config } = useLanguage();
-  
-  // Kick off dictionary loading once per hook usage and when language changes
-  useEffect(() => {
-    ensureDictionaryLoaded(config.code, config.normalizeFunction);
-  }, [config.code, config.normalizeFunction]);
-  
-  const secretWordRef = useRef<string>("");
+  const mode = options?.mode ?? 'local';
+  const apiLanguage = options?.apiLanguage ?? 'sq';
+  const targetToken = options?.targetToken ?? null;
+  const validateGuess =
+    options?.validateGuess ??
+    ((g: string) => postDictionaryValidate(apiLanguage, g));
+
+  const secretWordRef = useRef<string>('');
+  const submittingRef = useRef(false);
 
   const [gameState, setGameState] = useState<GameState>(() => {
     const normalized = config.normalizeFunction(targetWord);
     secretWordRef.current = normalized;
-    // Persist only when a gameId is provided (daily/friends). Free play should not persist.
     const storageKey = gameId;
-    
-    // Try to load saved game state (without target word for security) only for persistent games
+
     if (storageKey) {
       const savedState = localStorage.getItem(storageKey);
       if (savedState) {
         try {
           const parsed = JSON.parse(savedState);
-          // Convert letterStates Map back from object
           const letterStates = new Map(Object.entries(parsed.letterStates || {}));
-          // Restore state but always use the current target word (never from storage)
           return {
             ...parsed,
             letterStates,
-            targetWord: normalized // Always use current target, never stored
+            rowFeedback: parsed.rowFeedback,
           };
-        } catch (e) {
+        } catch {
           console.warn('Failed to parse saved game state');
         }
       }
     }
-    
+
     return {
-      board: Array(ROWS).fill(null).map(() => Array(COLS).fill('')),
+      board: Array(ROWS)
+        .fill(null)
+        .map(() => Array(COLS).fill('')),
       currentRow: 0,
       currentCol: 0,
       gameStatus: 'playing' as const,
       guesses: [],
-      letterStates: new Map()
+      letterStates: new Map(),
+      rowFeedback: mode === 'api' ? [] : undefined,
     };
   });
 
@@ -56,155 +104,289 @@ export function useWordleGame(targetWord: string, gameId?: string) {
   const [isWordCompleteAnimating, setIsWordCompleteAnimating] = useState(false);
   const [invalidReason, setInvalidReason] = useState<string | null>(null);
 
-  const updateLetterStates = useCallback((guess: string, target: string) => {
-    const newLetterStates = new Map(gameState.letterStates);
-    const normalizedGuess = config.normalizeFunction(guess);
-    const normalizedTarget = config.normalizeFunction(target);
-    
-    for (let i = 0; i < normalizedGuess.length; i++) {
-      const letter = normalizedGuess[i];
-      if (letter === normalizedTarget[i]) {
-        newLetterStates.set(letter, 'correct');
-      } else if (normalizedTarget.includes(letter) && newLetterStates.get(letter) !== 'correct') {
-        newLetterStates.set(letter, 'partial');
-      } else if (!normalizedTarget.includes(letter)) {
-        newLetterStates.set(letter, 'incorrect');
-      }
-    }
-    
-    return newLetterStates;
-  }, [gameState.letterStates]);
+  const persist = useCallback(
+    (state: GameState) => {
+      if (!gameId) return;
+      const stateToSave = {
+        board: state.board,
+        currentRow: state.currentRow,
+        currentCol: state.currentCol,
+        gameStatus: state.gameStatus,
+        guesses: state.guesses,
+        letterStates: Object.fromEntries(state.letterStates),
+        rowFeedback: state.rowFeedback,
+      };
+      localStorage.setItem(gameId, JSON.stringify(stateToSave));
+    },
+    [gameId]
+  );
 
-  const handleKeyPress = useCallback((key: string) => {
-    if (gameState.gameStatus !== 'playing' || isRevealing) return;
+  const triggerRevealAnimation = useCallback(() => {
+    setIsRevealing(true);
+    setTimeout(() => {
+      setIsRevealing(false);
+      setIsWordCompleteAnimating(true);
+      setTimeout(() => setIsWordCompleteAnimating(false), 2500);
+    }, 1500);
+  });
 
-    // Clear invalid message when user starts editing with backspace
-    if (key === 'BACKSPACE' && invalidReason) {
-      setInvalidReason(null);
-    }
+  const applySubmitResponse = useCallback(
+    (guess: string, data: SubmitGuessResponse) => {
+      const feedback = mapApiRow(data.result);
+      const isWin = data.is_win;
+      const revealed = data.target_word;
 
-    setGameState(prevState => {
-      const newState = { ...prevState };
-      
-      if (key === 'BACKSPACE') {
-        if (newState.currentCol > 0) {
-          newState.currentCol--;
-          newState.board[newState.currentRow][newState.currentCol] = '';
-        }
-      } else if (key === 'ENTER') {
-        if (newState.currentCol === COLS) {
-          const currentGuess = newState.board[newState.currentRow].join('');
-          
-          // Validation rules
-          const normalizedGuess = config.normalizeFunction(currentGuess);
-          const target = secretWordRef.current; // already normalized
-          const isTargetMatch = normalizedGuess === target;
-          // Make sure dictionary is loaded before validating. If not ready, try to load and block submit this tick.
-          if (!isDictionaryReady()) {
-            // Trigger async load but do not accept guess until loaded
-            ensureDictionaryLoaded();
-            setInvalidReason('not_in_dictionary');
-            return newState;
-          }
-          const isDictionaryOk = isValidGuess(normalizedGuess, config.normalizeFunction);
-          const isValid = normalizedGuess.length === COLS && (isTargetMatch || isDictionaryOk);
+      setGameState((prev) => {
+        const row = prev.currentRow;
+        const nextRowFeedback = [...(prev.rowFeedback || [])];
+        nextRowFeedback[row] = feedback;
 
-          if (isValid) {
-            newState.guesses.push(normalizedGuess);
-            
-            // Update letter states
-            newState.letterStates = updateLetterStates(normalizedGuess, target);
-            
-            // Check if won
-            let allEqual = true;
-            for (let i = 0; i < COLS; i++) {
-              if (normalizedGuess[i] !== target[i]) { allEqual = false; break; }
-            }
-            if (allEqual) {
-              newState.gameStatus = 'won';
-            } else if (newState.currentRow === ROWS - 1) {
-              newState.gameStatus = 'lost';
-            } else {
-              newState.currentRow++;
-              newState.currentCol = 0;
-            }
-            
-            // Trigger revealing animation
-            setIsRevealing(true);
-            setTimeout(() => {
-              setIsRevealing(false);
-              // Trigger word completion color animation after reveal
-              setIsWordCompleteAnimating(true);
-              setTimeout(() => setIsWordCompleteAnimating(false), 2500);
-            }, 1500);
-            setInvalidReason(null);
-          } else {
-            // Signal invalid guess so UI can inform the user
-            setInvalidReason('not_in_dictionary');
-          }
-        }
-      } else if (newState.currentCol < COLS && key.length === 1) {
-        const normKey = config.normalizeFunction(key);
-        newState.board[newState.currentRow][newState.currentCol] = normKey;
-        newState.currentCol++;
+        const letterStates = mergeLetterStatesFromFeedback(
+          prev.letterStates,
+          guess,
+          feedback
+        );
 
-        // If row is now complete, pre-validate immediately and signal invalid
-        if (newState.currentCol === COLS) {
-          const currentGuess = newState.board[newState.currentRow].join('');
-          const normalizedGuess = config.normalizeFunction(currentGuess);
-          const target = secretWordRef.current; // normalized
+        let gameStatus = prev.gameStatus;
+        let currentRow = prev.currentRow;
+        let currentCol = 0;
+        const guesses = [...prev.guesses, config.normalizeFunction(guess)];
 
-          if (isDictionaryReady()) {
-            const isTargetMatch = normalizedGuess === target;
-            const isDictionaryOk = isValidGuess(normalizedGuess, config.normalizeFunction);
-            const isValid = isTargetMatch || isDictionaryOk;
-            setInvalidReason(isValid ? null : 'not_in_dictionary');
-          }
+        if (isWin) {
+          gameStatus = 'won';
+        } else if (row === ROWS - 1) {
+          gameStatus = 'lost';
         } else {
-          // Clear invalid message while typing before reaching 5 letters
-          if (invalidReason) setInvalidReason(null);
+          currentRow = row + 1;
+        }
+
+        if (revealed) {
+          secretWordRef.current = config.normalizeFunction(revealed);
+        }
+
+        const next: GameState = {
+          ...prev,
+          guesses,
+          letterStates,
+          rowFeedback: nextRowFeedback,
+          gameStatus,
+          currentRow,
+          currentCol,
+        };
+        persist(next);
+        return next;
+      });
+
+      triggerRevealAnimation();
+      setInvalidReason(null);
+    },
+    [config, persist, triggerRevealAnimation]
+  );
+
+  const submitApiRow = useCallback(
+    async (guess: string, rowIndex: number) => {
+      if (!targetToken || submittingRef.current) return;
+      submittingRef.current = true;
+      setInvalidReason(null);
+      try {
+        const data = await postGamesSubmit({
+          language: apiLanguage,
+          guess,
+          targetToken,
+          isLastRow: rowIndex === ROWS - 1,
+        });
+        applySubmitResponse(guess, data);
+      } catch (e: unknown) {
+        const status = (e as { status?: number }).status;
+        if (status === 422) {
+          setInvalidReason('not_in_dictionary');
+        } else {
+          setInvalidReason('not_in_dictionary');
+        }
+      } finally {
+        submittingRef.current = false;
+      }
+    },
+    [targetToken, apiLanguage, applySubmitResponse]
+  );
+
+  const submitLocalRow = useCallback(
+    async (currentGuess: string) => {
+      const normalizedGuess = config.normalizeFunction(currentGuess);
+      const target = secretWordRef.current;
+
+      if (validateGuess) {
+        const ok = await validateGuess(currentGuess);
+        if (!ok) {
+          setInvalidReason('not_in_dictionary');
+          return;
         }
       }
-      
-      // Save game state (excluding target word) only for persistent games
-      if (gameId) {
-        const stateToSave = {
-          board: newState.board,
-          currentRow: newState.currentRow,
-          currentCol: newState.currentCol,
-          gameStatus: newState.gameStatus,
-          guesses: newState.guesses,
-          // Never store the target word for security
-          letterStates: Object.fromEntries(newState.letterStates)
+
+      setGameState((prev) => {
+        const nextGuesses = [...prev.guesses, normalizedGuess];
+        let letterStates = new Map(prev.letterStates);
+        const matchGuess = normalizeForWordleMatch(currentGuess);
+        const matchTarget = normalizeForWordleMatch(target);
+        for (let i = 0; i < matchGuess.length; i++) {
+          const letter = normalizedGuess[i];
+          if (matchGuess[i] === matchTarget[i]) {
+            letterStates.set(letter, 'correct');
+          } else if (
+            matchTarget.includes(matchGuess[i]) &&
+            letterStates.get(letter) !== 'correct'
+          ) {
+            letterStates.set(letter, 'partial');
+          } else if (!matchTarget.includes(matchGuess[i])) {
+            letterStates.set(letter, 'incorrect');
+          }
+        }
+
+        let gameStatus = prev.gameStatus;
+        let currentRow = prev.currentRow;
+        let currentCol = 0;
+
+        let allEqual = true;
+        for (let i = 0; i < COLS; i++) {
+          if (matchGuess[i] !== matchTarget[i]) {
+            allEqual = false;
+            break;
+          }
+        }
+        if (allEqual) {
+          gameStatus = 'won';
+        } else if (prev.currentRow === ROWS - 1) {
+          gameStatus = 'lost';
+        } else {
+          currentRow = prev.currentRow + 1;
+        }
+
+        const next: GameState = {
+          ...prev,
+          guesses: nextGuesses,
+          letterStates,
+          gameStatus,
+          currentRow,
+          currentCol,
         };
-        localStorage.setItem(gameId, JSON.stringify(stateToSave));
+        persist(next);
+        return next;
+      });
+
+      triggerRevealAnimation();
+      setInvalidReason(null);
+    },
+    [config, validateGuess, persist, triggerRevealAnimation]
+  );
+
+  const handleKeyPress = useCallback(
+    (key: string) => {
+      if (gameState.gameStatus !== 'playing' || isRevealing) return;
+      if (mode === 'api' && submittingRef.current) return;
+
+      if (key === 'BACKSPACE' && invalidReason) {
+        setInvalidReason(null);
       }
-      
-      return newState;
-    });
-  }, [gameState.gameStatus, gameState.letterStates, isRevealing, updateLetterStates, gameId, invalidReason]);
 
-  const resetGame = useCallback((newTargetWord?: string) => {
-    const normalized = config.normalizeFunction(newTargetWord || targetWord);
-    
-    // Clear saved state only for persistent games
-    if (gameId) {
-      localStorage.removeItem(gameId);
-    }
-    
+      if (key === 'ENTER' && mode === 'api') {
+        if (gameState.currentCol !== COLS || !targetToken) return;
+        const guess = gameState.board[gameState.currentRow].join('');
+        void submitApiRow(guess, gameState.currentRow);
+        return;
+      }
+
+      if (key === 'ENTER' && mode === 'local') {
+        if (gameState.currentCol !== COLS) return;
+        const currentGuess = gameState.board[gameState.currentRow].join('');
+        void submitLocalRow(currentGuess);
+        return;
+      }
+
+      setGameState((prevState) => {
+        const newState = { ...prevState };
+
+        if (key === 'BACKSPACE') {
+          if (newState.currentCol > 0) {
+            newState.currentCol--;
+            newState.board[newState.currentRow][newState.currentCol] = '';
+          }
+        } else if (newState.currentCol < COLS && key.length === 1) {
+          const normKey = config.normalizeFunction(key);
+          newState.board[newState.currentRow][newState.currentCol] = normKey;
+          newState.currentCol++;
+
+          if (newState.currentCol === COLS) {
+            const currentGuess = newState.board[newState.currentRow].join('');
+            const normalizedGuess = config.normalizeFunction(currentGuess);
+            const target = secretWordRef.current;
+            if (validateGuess) {
+              void validateGuess(currentGuess).then((ok) => {
+                setInvalidReason(ok ? null : 'not_in_dictionary');
+              });
+            } else {
+              const isTargetMatch =
+                normalizeForWordleMatch(currentGuess) === normalizeForWordleMatch(target);
+              setInvalidReason(isTargetMatch ? null : 'not_in_dictionary');
+            }
+          } else if (invalidReason) {
+            setInvalidReason(null);
+          }
+        }
+
+        persist(newState);
+        return newState;
+      });
+    },
+    [
+      gameState.gameStatus,
+      gameState.currentCol,
+      gameState.currentRow,
+      gameState.board,
+      isRevealing,
+      invalidReason,
+      gameId,
+      config,
+      mode,
+      targetToken,
+      validateGuess,
+      submitApiRow,
+      submitLocalRow,
+      persist,
+    ]
+  );
+
+  useEffect(() => {
+    const normalized = config.normalizeFunction(targetWord);
     secretWordRef.current = normalized;
+  }, [targetWord, config]);
 
-    setGameState({
-      board: Array(ROWS).fill(null).map(() => Array(COLS).fill('')),
-      currentRow: 0,
-      currentCol: 0,
-      gameStatus: 'playing',
-      guesses: [],
-      letterStates: new Map()
-    });
-    setIsRevealing(false);
-    setIsWordCompleteAnimating(false);
-  }, [targetWord, gameId]);
+  const resetGame = useCallback(
+    (newTargetWord?: string) => {
+      const normalized = config.normalizeFunction(newTargetWord || targetWord);
+
+      if (gameId) {
+        localStorage.removeItem(gameId);
+      }
+
+      secretWordRef.current = normalized;
+
+      setGameState({
+        board: Array(ROWS)
+          .fill(null)
+          .map(() => Array(COLS).fill('')),
+        currentRow: 0,
+        currentCol: 0,
+        gameStatus: 'playing',
+        guesses: [],
+        letterStates: new Map(),
+        rowFeedback: mode === 'api' ? [] : undefined,
+      });
+      setIsRevealing(false);
+      setIsWordCompleteAnimating(false);
+      setInvalidReason(null);
+    },
+    [targetWord, gameId, config, mode]
+  );
 
   return {
     gameState,
@@ -213,6 +395,6 @@ export function useWordleGame(targetWord: string, gameId?: string) {
     handleKeyPress,
     resetGame,
     invalidReason,
-    getTargetWord: () => secretWordRef.current
+    getTargetWord: () => secretWordRef.current,
   };
 }
