@@ -43,7 +43,6 @@ const languageConfigs: Record<Language, LanguageConfig> = {
     alphabet: ALBANIAN_ALPHABET,
     normalizeFunction: normalizeAlbanian,
     isValidWordFunction: isValidAlbanianWord,
-    dictionaryPath: '/dictionary.json'
   },
   english: {
     code: 'english',
@@ -53,7 +52,6 @@ const languageConfigs: Record<Language, LanguageConfig> = {
     alphabet: ENGLISH_ALPHABET,
     normalizeFunction: normalizeEnglish,
     isValidWordFunction: isValidEnglishWord,
-    dictionaryPath: '/dictionary-en.json'
   }
 };
 

@@ -3,14 +3,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { normalizeAlbanian, isValidAlbanianWord } from '@/utils/albanian';
 import { useToast } from '@/hooks/use-toast';
 import { Share2, Copy } from 'lucide-react';
 import { KeyboardOverlay } from '@/components/game/KeyboardOverlay';
 import { GameHeader } from '@/components/game/GameHeader';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { encryptPayload } from '@/utils/crypto';
-import { ensureDictionaryLoaded, isValidGuess } from '@/utils/dictionary';
+import { postDictionaryValidate, toApiLanguage } from '@/lib/api';
 
 export function CreateGame() {
   const [word, setWord] = useState('');
@@ -19,57 +18,53 @@ export function CreateGame() {
   const [isWordValid, setIsWordValid] = useState<boolean | null>(null);
   const { toast } = useToast();
   const { config, t, language } = useLanguage();
+  const apiLang = toApiLanguage(language);
 
-  // Ensure dictionary is loaded when component mounts
   useEffect(() => {
-    ensureDictionaryLoaded(config.code, config.normalizeFunction);
-  }, [config.code, config.normalizeFunction]);
-
-  // Validate word in real-time as user types
-  useEffect(() => {
-    if (word.length === 5) {
-      const normalizedWord = config.normalizeFunction(word);
-      const isValid = isValidGuess(normalizedWord, config.normalizeFunction);
-      setIsWordValid(isValid);
-    } else {
+    if (word.length !== 5) {
       setIsWordValid(null);
-    }
-  }, [word, config]);
-
-  // Handle on-screen Albanian keyboard input for the word field
-  const handleVirtualKey = useCallback((key: string) => {
-    if (key === 'BACKSPACE') {
-      setWord(prev => prev.slice(0, Math.max(0, prev.length - 1)));
       return;
     }
-    if (key === 'ENTER') {
-      // ignore ENTER on create screen
-      return;
-    }
-    // Append letter if space available
-    setWord(prev => (prev.length < 5 ? (prev + key).toUpperCase() : prev));
-  }, []);
+    let cancelled = false;
+    void postDictionaryValidate(apiLang, word).then((ok) => {
+      if (!cancelled) setIsWordValid(ok);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [word, apiLang]);
 
-  // Handle physical keyboard input for the word field
+  const handleVirtualKey = useCallback(
+    (key: string) => {
+      if (key === 'BACKSPACE') {
+        setWord((prev) => prev.slice(0, Math.max(0, prev.length - 1)));
+        return;
+      }
+      if (key === 'ENTER') {
+        return;
+      }
+      setWord((prev) => (prev.length < 5 ? (prev + key).toUpperCase() : prev));
+    },
+    []
+  );
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      // Only affect when focused within this page
       const active = document.activeElement as HTMLElement | null;
       const isWordFieldActive = active && active.id === 'word';
       if (!isWordFieldActive) return;
 
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       const key = event.key.toUpperCase();
-      
+
       if (key === 'BACKSPACE' || key === 'DELETE') {
         event.preventDefault();
-        setWord(prev => prev.slice(0, Math.max(0, prev.length - 1)));
+        setWord((prev) => prev.slice(0, Math.max(0, prev.length - 1)));
       } else if (key.length === 1) {
-        // Allow physical keyboard typing for valid characters
         const normalized = config.normalizeFunction(key);
         if (config.alphabet.includes(normalized)) {
           event.preventDefault();
-          setWord(prev => (prev.length < 5 ? (prev + normalized).toUpperCase() : prev));
+          setWord((prev) => (prev.length < 5 ? (prev + normalized).toUpperCase() : prev));
         }
       }
     };
@@ -77,27 +72,24 @@ export function CreateGame() {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [config]);
 
-  // Note: We no longer expose raw JSON via Base64; we encrypt the payload.
-
   const handleCreateGame = async () => {
     const normalizedWord = config.normalizeFunction(word);
-    
-    // First check basic word structure
+
     if (normalizedWord.length !== 5) {
       toast({
         title: t.invalidWord,
         description: language === 'english' ? 'Word must be exactly 5 letters.' : 'Fjala duhet të ketë saktësisht 5 shkronja.',
-        variant: 'destructive'
+        variant: 'destructive',
       });
       return;
     }
 
-    // Then check if the word exists in the dictionary
-    if (!isValidGuess(normalizedWord, config.normalizeFunction)) {
+    const ok = await postDictionaryValidate(apiLang, word);
+    if (!ok) {
       toast({
         title: t.invalidWord,
         description: t.pleaseEnterValidWord,
-        variant: 'destructive'
+        variant: 'destructive',
       });
       return;
     }
@@ -106,23 +98,22 @@ export function CreateGame() {
       toast({
         title: t.nameMissing,
         description: t.pleaseEnterName,
-        variant: 'destructive'
+        variant: 'destructive',
       });
       return;
     }
 
-    // Create an encrypted self-contained payload so the link works without localStorage
     const payload = {
       word: normalizedWord,
       creatorName: creatorName.trim(),
       createdAt: Date.now(),
-      language: config.code
+      language: config.code,
     };
     const gameId = await encryptPayload(payload);
     const link = `${window.location.origin}/friends/${gameId}`;
 
     setGameLink(link);
-    
+
     toast({
       title: t.gameCreated,
       description: t.nowShareLink,
@@ -140,7 +131,7 @@ export function CreateGame() {
       toast({
         title: t.error,
         description: t.couldNotCopy,
-        variant: 'destructive'
+        variant: 'destructive',
       });
     }
   };
@@ -151,7 +142,7 @@ export function CreateGame() {
         await navigator.share({
           title: `me llafe - ${t.challengeFrom} ${creatorName}`,
           text: `${creatorName} ${language === 'english' ? 'challenged you to a wordle game!' : 'ju sfidoi në një lojë me llafe!'}`,
-          url: gameLink
+          url: gameLink,
         });
       } catch (err) {
         copyToClipboard();
@@ -168,9 +159,7 @@ export function CreateGame() {
       <div className="flex-1 flex items-center justify-center p-2 sm:p-4 pb-0">
         <Card className="w-full max-w-md touch-none" onTouchMove={(e) => e.preventDefault()}>
           <CardHeader className="text-center">
-            <CardTitle className="text-xl sm:text-2xl">
-              {t.createGameForFriends}
-            </CardTitle>
+            <CardTitle className="text-xl sm:text-2xl">{t.createGameForFriends}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 sm:space-y-4">
             <div className="space-y-2">
@@ -180,7 +169,6 @@ export function CreateGame() {
                   id="word"
                   value={word}
                   onChange={(e) => {
-                    // Allow direct input changes but normalize and limit to 5 characters
                     const value = e.target.value.toUpperCase();
                     const normalized = config.normalizeFunction(value);
                     setWord(normalized.slice(0, 5));
@@ -188,12 +176,12 @@ export function CreateGame() {
                   maxLength={5}
                   placeholder="FJALË"
                   className={`text-center text-lg font-mono ${
-                    word.length === 5 
-                      ? isWordValid === true 
-                        ? 'border-green-500 bg-green-50' 
-                        : isWordValid === false 
-                        ? 'border-red-500 bg-red-50' 
-                        : ''
+                    word.length === 5
+                      ? isWordValid === true
+                        ? 'border-green-500 bg-green-50'
+                        : isWordValid === false
+                          ? 'border-red-500 bg-red-50'
+                          : ''
                       : ''
                   }`}
                 />
@@ -211,14 +199,13 @@ export function CreateGame() {
               </div>
               {word.length === 5 && isWordValid === false && (
                 <p className="text-sm text-red-600">
-                  {language === 'english' 
+                  {language === 'english'
                     ? 'This word is not in our dictionary. Please try another word.'
-                    : 'Kjo fjalë nuk është në fjalorën tonë. Ju lutemi provoni një fjalë tjetër.'
-                  }
+                    : 'Kjo fjalë nuk është në fjalorën tonë. Ju lutemi provoni një fjalë tjetër.'}
                 </p>
               )}
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="name">{t.yourName}</Label>
               <Input
@@ -230,8 +217,8 @@ export function CreateGame() {
             </div>
 
             {!gameLink ? (
-              <Button 
-                onClick={handleCreateGame} 
+              <Button
+                onClick={handleCreateGame}
                 className="w-full"
                 disabled={word.length !== 5 || !creatorName.trim() || isWordValid !== true}
               >
@@ -243,7 +230,7 @@ export function CreateGame() {
                   <Label className="text-xs text-muted-foreground">{language === 'english' ? 'Your link:' : 'Lidhja juaj:'}</Label>
                   <p className="text-sm font-mono break-all mt-1">{gameLink}</p>
                 </div>
-                
+
                 <div className="flex gap-2">
                   <Button onClick={copyToClipboard} variant="outline" className="flex-1">
                     <Copy className="w-4 h-4 mr-2" />
@@ -255,13 +242,13 @@ export function CreateGame() {
                   </Button>
                 </div>
 
-                <Button 
+                <Button
                   onClick={() => {
                     setWord('');
                     setCreatorName('');
                     setGameLink('');
-                  }} 
-                  variant="ghost" 
+                  }}
+                  variant="ghost"
                   className="w-full"
                 >
                   {language === 'english' ? 'Create another game' : 'Krijo tjetër lojë'}
@@ -272,12 +259,7 @@ export function CreateGame() {
         </Card>
       </div>
 
-      {/* Single bottom-fixed keyboard overlay via portal */}
-      <KeyboardOverlay
-        onKeyPress={handleVirtualKey}
-        letterStates={new Map()}
-        disabled={false}
-      />
+      <KeyboardOverlay onKeyPress={handleVirtualKey} letterStates={new Map()} disabled={false} />
     </div>
   );
 }

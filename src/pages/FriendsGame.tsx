@@ -10,8 +10,8 @@ import { decryptPayload } from '@/utils/crypto';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Share2, RotateCcw } from 'lucide-react';
-
-// legacy base64 decoder removed; we now use encrypted payloads
+import { postDictionaryValidate, toApiLanguage } from '@/lib/api';
+import type { Language } from '@/types/language';
 
 export default function FriendsGame() {
   const { gameId } = useParams();
@@ -20,7 +20,6 @@ export default function FriendsGame() {
   const [customGame, setCustomGame] = useState<CustomGame | null>(null);
   const [notFound, setNotFound] = useState(false);
 
-  // Load game data
   useEffect(() => {
     if (!gameId) {
       setNotFound(true);
@@ -28,19 +27,18 @@ export default function FriendsGame() {
     }
 
     decryptPayload(gameId).then((maybe) => {
-      const parsed = maybe as any;
+      const parsed = maybe as { word?: string; creatorName?: string; createdAt?: number; language?: string } | null;
       if (parsed && parsed.word && parsed.creatorName) {
         setCustomGame({
           id: gameId,
           word: parsed.word,
           creatorName: parsed.creatorName,
           createdAt: parsed.createdAt || Date.now(),
-          language: parsed.language || 'albanian'
+          language: parsed.language || 'albanian',
         });
         return;
       }
 
-      // Fallback to legacy localStorage
       const gameData = localStorage.getItem(`game-${gameId}`);
       if (gameData) {
         try {
@@ -50,43 +48,60 @@ export default function FriendsGame() {
             word: legacy.word,
             creatorName: legacy.creatorName,
             createdAt: legacy.createdAt,
-            language: legacy.language || 'albanian'
+            language: legacy.language || 'albanian',
           });
           return;
-        } catch (_e) {}
+        } catch (_e) {
+          /* ignore */
+        }
       }
       setNotFound(true);
     });
   }, [gameId]);
 
-  const { gameState, isRevealing, isWordCompleteAnimating, handleKeyPress, resetGame, getTargetWord, invalidReason } = useWordleGame(
-    customGame?.word || 'FJALE',
-    gameId
-  );
+  const uiLang = (customGame?.language || 'albanian') as Language;
+  const apiLang = toApiLanguage(uiLang);
 
-  // Ensure the target word is set after async load of customGame
+  const { gameState, isRevealing, isWordCompleteAnimating, handleKeyPress, resetGame, getTargetWord, invalidReason } =
+    useWordleGame(customGame?.word || 'FJALE', gameId, {
+      mode: 'local',
+      apiLanguage: apiLang,
+      validateGuess: (g) => postDictionaryValidate(apiLang, g),
+    });
+
   useEffect(() => {
     if (customGame?.word) {
       resetGame(customGame.word);
     }
   }, [customGame?.word, resetGame]);
 
-  // Handle keyboard events - allow full keyboard input for friends games too (incl. Alt-code/IME letters)
   useEffect(() => {
     if (!customGame) return;
 
     const gameLanguage = customGame.language || 'albanian';
-    const languageConfig = gameLanguage === 'english' ? 
-      { alphabet: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'], normalizeFunction: (text: string) => text.toUpperCase().trim() } :
-      { alphabet: ['A', 'B', 'C', 'Ç', 'D', 'DH', 'E', 'Ë', 'F', 'G', 'GJ', 'H', 'I', 'J', 'K', 'L', 'LL', 'M', 'N', 'NJ', 'O', 'P', 'Q', 'R', 'RR', 'S', 'SH', 'T', 'TH', 'U', 'V', 'X', 'XH', 'Y', 'Z', 'ZH'], normalizeFunction: (text: string) => text.toUpperCase().normalize('NFC').trim() };
+    const languageConfig =
+      gameLanguage === 'english'
+        ? {
+            alphabet: [
+              'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U',
+              'V', 'W', 'X', 'Y', 'Z',
+            ],
+            normalizeFunction: (text: string) => text.toUpperCase().trim(),
+          }
+        : {
+            alphabet: [
+              'A', 'B', 'C', 'Ç', 'D', 'DH', 'E', 'Ë', 'F', 'G', 'GJ', 'H', 'I', 'J', 'K', 'L', 'LL', 'M', 'N', 'NJ',
+              'O', 'P', 'Q', 'R', 'RR', 'S', 'SH', 'T', 'TH', 'U', 'V', 'X', 'XH', 'Y', 'Z', 'ZH',
+            ],
+            normalizeFunction: (text: string) => text.toUpperCase().normalize('NFC').trim(),
+          };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Don't interfere with browser shortcuts or form inputs
       if (event.ctrlKey || event.metaKey) return;
       if (event.target && (event.target as HTMLElement).tagName === 'INPUT') return;
-      
+
       const key = event.key.toUpperCase();
-      
+
       if (key === 'BACKSPACE' || key === 'DELETE') {
         event.preventDefault();
         handleKeyPress('BACKSPACE');
@@ -123,7 +138,6 @@ export default function FriendsGame() {
     };
   }, [handleKeyPress, customGame]);
 
-  // Show game result
   useEffect(() => {
     if (!customGame) return;
 
@@ -138,18 +152,19 @@ export default function FriendsGame() {
         description: `${t.theWordWas} ${customGame.creatorName} was "${getTargetWord()}".`,
       });
     }
-  }, [gameState.gameStatus, gameState.currentRow, customGame, toast, getTargetWord]);
+  }, [gameState.gameStatus, gameState.currentRow, customGame, toast, getTargetWord, t]);
 
-  // Show invalid guess alert immediately
   useEffect(() => {
     if (!customGame) return;
     if (invalidReason === 'not_in_dictionary') {
       toast({
-        title: customGame.language === 'english' ? 'Not in word list' : 'Nuk është në listën e fjalëve',
-        description: customGame.language === 'english' ? 'Please enter a valid 5-letter word.' : 'Ju lutemi shkruani një fjalë të vlefshme me 5 shkronja.'
+        title: customGame.language === 'english' ? 'Word not in dictionary' : 'Fjalë nuk është në fjalorë',
+        description:
+          customGame.language === 'english'
+            ? 'Please enter a valid 5-letter word.'
+            : 'Ju lutemi shkruani një fjalë të vlefshme me 5 shkronja.',
       });
     } else if (invalidReason === null) {
-      // Dismiss any existing toasts when invalid reason is cleared
       dismiss();
     }
   }, [invalidReason, customGame, toast, dismiss]);
@@ -170,36 +185,42 @@ export default function FriendsGame() {
   }
 
   return (
-    <div className="min-h-screen h-screen bg-gradient-subtle flex flex-col overflow-y-auto overscroll-contain" style={{ minHeight: '100vh', height: '100vh' }}>
-      <GameHeader 
-        title="" 
+    <div
+      className="min-h-screen h-screen bg-gradient-subtle flex flex-col overflow-y-auto overscroll-contain"
+      style={{ minHeight: '100vh', height: '100vh' }}
+    >
+      <GameHeader
+        title=""
         onReset={() => resetGame(customGame.word)}
         showFriendsButton={false}
         creatorName={customGame.creatorName}
       />
-      
-      <main 
+
+      <main
         className="flex-1 flex flex-col items-center justify-start max-w-lg mx-auto w-full px-2 sm:px-4 py-2 sm:py-4 relative"
         style={{ paddingBottom: 'clamp(180px, 32vh, 300px)' }}
       >
-        {/* Game completion celebration */}
         {gameState.gameStatus === 'won' && (
           <div className="mb-3 sm:mb-4 text-center animate-victory-bounce w-full max-w-sm mx-auto">
             <div className="glass rounded-2xl p-4 sm:p-6 shadow-card animate-celebration-pulse relative">
               <div className="text-4xl sm:text-5xl mb-2 sm:mb-3 animate-bounce">🎉</div>
-              <h2 className="text-xl sm:text-2xl font-bold text-correct mb-1 sm:mb-2">
-                {t.youWon}
-              </h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-correct mb-1 sm:mb-2">{t.youWon}</h2>
               <p className="text-sm sm:text-base text-muted-foreground">
                 {t.youGuessedWord} {customGame.creatorName}!
               </p>
-              {/* Confetti effect */}
               <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
-                <div className="absolute top-0 left-1/4 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-yellow-400 rounded-full animate-confetti" style={{ animationDelay: '0s' }}></div>
-                <div className="absolute top-0 left-1/2 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-400 rounded-full animate-confetti" style={{ animationDelay: '0.2s' }}></div>
-                <div className="absolute top-0 left-3/4 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-400 rounded-full animate-confetti" style={{ animationDelay: '0.4s' }}></div>
-                <div className="absolute top-0 left-1/3 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-red-400 rounded-full animate-confetti" style={{ animationDelay: '0.6s' }}></div>
-                <div className="absolute top-0 left-2/3 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-purple-400 rounded-full animate-confetti" style={{ animationDelay: '0.8s' }}></div>
+                <div
+                  className="absolute top-0 left-1/4 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-yellow-400 rounded-full animate-confetti"
+                  style={{ animationDelay: '0s' }}
+                ></div>
+                <div
+                  className="absolute top-0 left-1/2 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-400 rounded-full animate-confetti"
+                  style={{ animationDelay: '0.2s' }}
+                ></div>
+                <div
+                  className="absolute top-0 left-3/4 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-400 rounded-full animate-confetti"
+                  style={{ animationDelay: '0.4s' }}
+                ></div>
               </div>
             </div>
           </div>
@@ -209,9 +230,7 @@ export default function FriendsGame() {
           <div className="mb-3 sm:mb-4 text-center animate-bounce-in">
             <div className="glass rounded-2xl p-4 sm:p-5 shadow-card">
               <div className="text-4xl mb-3">😅</div>
-              <h2 className="text-xl font-bold text-primary mb-2">
-                {t.betterLuckNextTime}
-              </h2>
+              <h2 className="text-xl font-bold text-primary mb-2">{t.betterLuckNextTime}</h2>
               <p className="text-base text-muted-foreground">
                 {t.theWordWas} "<span className="font-bold text-primary">{getTargetWord()}</span>"
               </p>
@@ -220,28 +239,26 @@ export default function FriendsGame() {
         )}
 
         <div className={`mt-2 sm:mt-4 mb-6 sm:mb-8 ${gameState.gameStatus === 'playing' ? 'animate-float' : ''}`}>
-          <GameBoard 
-            gameState={gameState} 
+          <GameBoard
+            gameState={gameState}
             revealingRow={isRevealing ? gameState.currentRow - 1 : undefined}
             getTargetWord={getTargetWord}
             isWordCompleteAnimating={isWordCompleteAnimating}
           />
         </div>
 
-        {/* Action buttons for completed games */}
         {gameState.gameStatus !== 'playing' && (
           <div className="mt-6 text-center space-y-3 animate-bounce-in" style={{ animationDelay: '0.3s' }}>
             <div className="flex gap-3 justify-center">
-              <Button 
+              <Button
                 onClick={() => {
-                  // Share results
                   const attempts = gameState.gameStatus === 'won' ? gameState.currentRow + 1 : 'X';
                   let grid = '';
                   for (let row = 0; row < Math.min(gameState.currentRow + 1, 6); row++) {
                     for (let col = 0; col < 5; col++) {
                       const letter = gameState.board[row][col];
                       if (!letter) continue;
-                      
+
                       if (letter === getTargetWord()[col]) {
                         grid += '🟩';
                       } else if (getTargetWord().includes(letter)) {
@@ -253,10 +270,11 @@ export default function FriendsGame() {
                     grid += '\n';
                   }
 
-                  const shareText = customGame.language === 'english' 
-                    ? `I ${gameState.gameStatus === 'won' ? 'solved' : 'tried'} ${customGame.creatorName}'s word challenge!\n${attempts}/6\n\n${grid}\n#WordleChallenge`
-                    : `${gameState.gameStatus === 'won' ? 'E zgjidha' : 'E provova'} sfidën e ${customGame.creatorName}!\n${attempts}/6\n\n${grid}\n#SfidaFjalesh`;
-                  
+                  const shareText =
+                    customGame.language === 'english'
+                      ? `I ${gameState.gameStatus === 'won' ? 'solved' : 'tried'} ${customGame.creatorName}'s word challenge!\n${attempts}/6\n\n${grid}\n#WordleChallenge`
+                      : `${gameState.gameStatus === 'won' ? 'E zgjidha' : 'E provova'} sfidën e ${customGame.creatorName}!\n${attempts}/6\n\n${grid}\n#SfidaFjalesh`;
+
                   if (navigator.share) {
                     navigator.share({ text: shareText });
                   } else {
@@ -274,13 +292,8 @@ export default function FriendsGame() {
                 <Share2 className="w-4 h-4 mr-2" />
                 {customGame.language === 'english' ? 'Share' : 'Ndaj'}
               </Button>
-              
-              <Button 
-                onClick={() => resetGame(customGame.word)}
-                size="sm"
-                variant="outline"
-                className="flex-1 max-w-32"
-              >
+
+              <Button onClick={() => resetGame(customGame.word)} size="sm" variant="outline" className="flex-1 max-w-32">
                 <RotateCcw className="w-4 h-4 mr-2" />
                 {customGame.language === 'english' ? 'Try Again' : 'Provo Sërish'}
               </Button>
@@ -288,19 +301,17 @@ export default function FriendsGame() {
           </div>
         )}
 
-        {/* Challenge info */}
         <div className="mt-4 text-center">
           <div className="glass rounded-xl p-3 shadow-sm">
             <p className="text-sm text-muted-foreground">
-              {customGame.language === 'english' 
+              {customGame.language === 'english'
                 ? `Challenge from ${customGame.creatorName}`
-                : `Sfida nga ${customGame.creatorName}`
-              }
+                : `Sfida nga ${customGame.creatorName}`}
             </p>
           </div>
         </div>
       </main>
-      
+
       <KeyboardOverlay
         onKeyPress={handleKeyPress}
         letterStates={gameState.letterStates}
