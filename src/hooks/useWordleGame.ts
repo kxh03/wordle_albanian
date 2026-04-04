@@ -12,11 +12,30 @@ import { normalizeForWordleMatch } from '@/utils/wordleNormalize';
 const ROWS = 6;
 const COLS = 5;
 
+export type ServerDailySnapshot = {
+  guesses: { guess: string; result: ('correct' | 'partial' | 'incorrect')[] }[];
+  answer: string | null;
+  status: 'playing' | 'won' | 'lost';
+};
+
+/** Response shape from POST /api/daily/guess */
+export type ServerGuessResponse = {
+  result: ('correct' | 'partial' | 'incorrect')[];
+  is_won: boolean;
+  attempts_left: number;
+  is_completed: boolean;
+  target_word?: string;
+};
+
 export type WordleGameOptions = {
-  mode: 'local' | 'api';
+  mode: 'local' | 'api' | 'server-daily';
   apiLanguage: ApiLanguage;
   targetToken?: string | null;
   validateGuess?: (guess: string) => Promise<boolean>;
+  /** Hydrate from GET /api/daily (authenticated). */
+  serverSnapshot?: ServerDailySnapshot | null;
+  /** Submit guess to Laravel (no target token on client). */
+  serverSubmitGuess?: (guess: string, rowIndex: number) => Promise<ServerGuessResponse>;
 };
 
 function mergeLetterStatesFromFeedback(
@@ -49,18 +68,78 @@ function mapApiRow(result: SubmitGuessResponse['result']): LetterState[] {
   });
 }
 
-export function useWordleGame(
-  targetWord: string,
-  gameId?: string,
-  options?: WordleGameOptions
-) {
+function buildInitialFromServerSnapshot(
+  snapshot: ServerDailySnapshot,
+  config: { normalizeFunction: (s: string) => string }
+): GameState {
+  if (snapshot.guesses.length === 0) {
+    return {
+      board: Array(ROWS)
+        .fill(null)
+        .map(() => Array(COLS).fill('')),
+      currentRow: 0,
+      currentCol: 0,
+      gameStatus: 'playing',
+      guesses: [],
+      letterStates: new Map(),
+      rowFeedback: [],
+    };
+  }
+
+  const board = Array(ROWS)
+    .fill(null)
+    .map(() => Array(COLS).fill(''));
+  const rowFeedback: LetterState[][] = [];
+  let letterStates = new Map<string, LetterState>();
+
+  snapshot.guesses.forEach((g, rowIdx) => {
+    const normGuess = config.normalizeFunction(g.guess);
+    for (let i = 0; i < COLS; i++) {
+      board[rowIdx][i] = normGuess[i] ?? '';
+    }
+    const feedback = mapApiRow(g.result);
+    rowFeedback[rowIdx] = feedback;
+    letterStates = mergeLetterStatesFromFeedback(letterStates, normGuess, feedback);
+  });
+
+  const guesses = snapshot.guesses.map((g) => config.normalizeFunction(g.guess));
+  const gameStatus = snapshot.status;
+
+  let currentRow: number;
+  let currentCol: number;
+  if (gameStatus === 'playing') {
+    currentRow = Math.min(snapshot.guesses.length, ROWS - 1);
+    if (snapshot.guesses.length < ROWS) {
+      currentRow = snapshot.guesses.length;
+      currentCol = 0;
+    } else {
+      currentRow = ROWS - 1;
+      currentCol = COLS;
+    }
+  } else {
+    currentRow = Math.max(0, snapshot.guesses.length - 1);
+    currentCol = COLS;
+  }
+
+  return {
+    board,
+    currentRow,
+    currentCol,
+    gameStatus,
+    guesses,
+    letterStates,
+    rowFeedback,
+  };
+}
+
+export function useWordleGame(targetWord: string, gameId?: string, options?: WordleGameOptions) {
   const { config } = useLanguage();
   const mode = options?.mode ?? 'local';
   const apiLanguage = options?.apiLanguage ?? 'sq';
   const targetToken = options?.targetToken ?? null;
+  const serverSubmitGuess = options?.serverSubmitGuess;
   const validateGuess =
-    options?.validateGuess ??
-    ((g: string) => postDictionaryValidate(apiLanguage, g));
+    options?.validateGuess ?? ((g: string) => postDictionaryValidate(apiLanguage, g));
 
   const secretWordRef = useRef<string>('');
   const submittingRef = useRef(false);
@@ -70,7 +149,15 @@ export function useWordleGame(
     secretWordRef.current = normalized;
     const storageKey = gameId;
 
-    if (storageKey) {
+    if (mode === 'server-daily' && options?.serverSnapshot) {
+      const st = buildInitialFromServerSnapshot(options.serverSnapshot, config);
+      secretWordRef.current = options.serverSnapshot.answer
+        ? config.normalizeFunction(options.serverSnapshot.answer)
+        : normalized;
+      return st;
+    }
+
+    if (storageKey && mode !== 'server-daily') {
       const savedState = localStorage.getItem(storageKey);
       if (savedState) {
         try {
@@ -96,7 +183,7 @@ export function useWordleGame(
       gameStatus: 'playing' as const,
       guesses: [],
       letterStates: new Map(),
-      rowFeedback: mode === 'api' ? [] : undefined,
+      rowFeedback: mode === 'api' || mode === 'server-daily' ? [] : undefined,
     };
   });
 
@@ -106,7 +193,7 @@ export function useWordleGame(
 
   const persist = useCallback(
     (state: GameState) => {
-      if (!gameId) return;
+      if (!gameId || mode === 'server-daily') return;
       const stateToSave = {
         board: state.board,
         currentRow: state.currentRow,
@@ -118,7 +205,7 @@ export function useWordleGame(
       };
       localStorage.setItem(gameId, JSON.stringify(stateToSave));
     },
-    [gameId]
+    [gameId, mode]
   );
 
   const triggerRevealAnimation = useCallback(() => {
@@ -141,11 +228,7 @@ export function useWordleGame(
         const nextRowFeedback = [...(prev.rowFeedback || [])];
         nextRowFeedback[row] = feedback;
 
-        const letterStates = mergeLetterStatesFromFeedback(
-          prev.letterStates,
-          guess,
-          feedback
-        );
+        const letterStates = mergeLetterStatesFromFeedback(prev.letterStates, guess, feedback);
 
         let gameStatus = prev.gameStatus;
         let currentRow = prev.currentRow;
@@ -185,19 +268,31 @@ export function useWordleGame(
 
   const submitApiRow = useCallback(
     async (guess: string, rowIndex: number) => {
-      if (!targetToken || submittingRef.current) return;
+      if (submittingRef.current) return;
+      if (mode === 'api' && !targetToken) return;
+      if (mode === 'server-daily' && !serverSubmitGuess) return;
       submittingRef.current = true;
       setInvalidReason(null);
       try {
-        const data = await postGamesSubmit({
-          language: apiLanguage,
-          guess,
-          targetToken,
-          isLastRow: rowIndex === ROWS - 1,
-        });
+        let data: SubmitGuessResponse;
+        if (mode === 'server-daily' && serverSubmitGuess) {
+          const raw = await serverSubmitGuess(guess, rowIndex);
+          data = {
+            result: raw.result,
+            is_win: raw.is_won,
+            target_word: raw.target_word,
+          };
+        } else {
+          data = await postGamesSubmit({
+            language: apiLanguage,
+            guess,
+            targetToken: targetToken!,
+            isLastRow: rowIndex === ROWS - 1,
+          });
+        }
         applySubmitResponse(guess, data);
       } catch (e: unknown) {
-        const status = (e as { status?: number }).status;
+        const status = (e as { response?: { status?: number } }).response?.status;
         if (status === 422) {
           setInvalidReason('not_in_dictionary');
         } else {
@@ -207,7 +302,7 @@ export function useWordleGame(
         submittingRef.current = false;
       }
     },
-    [targetToken, apiLanguage, applySubmitResponse]
+    [targetToken, apiLanguage, applySubmitResponse, mode, serverSubmitGuess]
   );
 
   const submitLocalRow = useCallback(
@@ -282,14 +377,16 @@ export function useWordleGame(
   const handleKeyPress = useCallback(
     (key: string) => {
       if (gameState.gameStatus !== 'playing' || isRevealing) return;
-      if (mode === 'api' && submittingRef.current) return;
+      if ((mode === 'api' || mode === 'server-daily') && submittingRef.current) return;
 
       if (key === 'BACKSPACE' && invalidReason) {
         setInvalidReason(null);
       }
 
-      if (key === 'ENTER' && mode === 'api') {
-        if (gameState.currentCol !== COLS || !targetToken) return;
+      if (key === 'ENTER' && (mode === 'api' || mode === 'server-daily')) {
+        if (gameState.currentCol !== COLS) return;
+        if (mode === 'api' && !targetToken) return;
+        if (mode === 'server-daily' && !serverSubmitGuess) return;
         const guess = gameState.board[gameState.currentRow].join('');
         void submitApiRow(guess, gameState.currentRow);
         return;
@@ -348,6 +445,7 @@ export function useWordleGame(
       config,
       mode,
       targetToken,
+      serverSubmitGuess,
       validateGuess,
       submitApiRow,
       submitLocalRow,
@@ -356,9 +454,10 @@ export function useWordleGame(
   );
 
   useEffect(() => {
+    if (mode === 'server-daily') return;
     const normalized = config.normalizeFunction(targetWord);
     secretWordRef.current = normalized;
-  }, [targetWord, config]);
+  }, [targetWord, config, mode]);
 
   const resetGame = useCallback(
     (newTargetWord?: string) => {
@@ -379,7 +478,7 @@ export function useWordleGame(
         gameStatus: 'playing',
         guesses: [],
         letterStates: new Map(),
-        rowFeedback: mode === 'api' ? [] : undefined,
+        rowFeedback: mode === 'api' || mode === 'server-daily' ? [] : undefined,
       });
       setIsRevealing(false);
       setIsWordCompleteAnimating(false);

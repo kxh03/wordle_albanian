@@ -64,6 +64,9 @@ const translations: Record<Language, Translations> = {
     freeGame: 'Lojë e Lirë',
     friends: 'Sfido Miqtë',
     resetGame: 'Rivendos Lojën',
+    login: 'Hyr',
+    register: 'Regjistrohu',
+    logout: 'Dil',
     
     // Daily Game
     todaysWord: 'Fjala e Sotme',
@@ -126,6 +129,9 @@ const translations: Record<Language, Translations> = {
     freeGame: 'Free Game',
     friends: 'Challenge Friends',
     resetGame: 'Reset Game',
+    login: 'Log in',
+    register: 'Register',
+    logout: 'Log out',
     
     // Daily Game
     todaysWord: 'Today\'s Word',
