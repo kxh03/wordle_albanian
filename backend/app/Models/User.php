@@ -11,7 +11,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable(['name', 'email', 'password', 'preferred_language'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -29,5 +29,15 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function stats(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(UserStat::class);
+    }
+
+    public function dailyGames(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(DailyGame::class);
     }
 }

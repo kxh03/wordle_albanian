@@ -4,7 +4,7 @@ namespace App\Http\Requests\Auth;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class RegisterRequest extends FormRequest
+class UpdateProfileRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -14,9 +14,7 @@ class RegisterRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8'],
+            'name' => ['sometimes', 'string', 'max:255'],
             'preferred_language' => ['sometimes', 'string', 'in:sq,en'],
         ];
     }

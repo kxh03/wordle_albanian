@@ -14,6 +14,7 @@ class DailyGame extends Model
         'game_date',
         'language',
         'is_completed',
+        'is_won',
         'attempts_used',
         'completed_at',
     ];
@@ -23,6 +24,7 @@ class DailyGame extends Model
         return [
             'game_date' => 'date',
             'is_completed' => 'boolean',
+            'is_won' => 'boolean',
             'completed_at' => 'datetime',
         ];
     }
