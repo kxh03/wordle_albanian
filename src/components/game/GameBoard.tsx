@@ -1,13 +1,14 @@
 import { GameTile } from './GameTile';
 import { GameState } from '@/types/game';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { normalizeForWordleMatch } from '@/utils/wordleNormalize';
 
 interface GameBoardProps {
   gameState: GameState;
   revealingRow?: number;
   getTargetWord?: () => string;
   isWordCompleteAnimating?: boolean;
+  /** Use on play screens: no oversized `md:` tiles so grid + keyboard fit in one viewport. */
+  compactLayout?: boolean;
 }
 
 export function GameBoard({
@@ -15,6 +16,7 @@ export function GameBoard({
   revealingRow,
   getTargetWord,
   isWordCompleteAnimating = false,
+  compactLayout = false,
 }: GameBoardProps) {
   const { board, rowFeedback } = gameState;
   const { config } = useLanguage();
@@ -58,7 +60,7 @@ export function GameBoard({
 
         let partialsBefore = 0;
         for (let i = 0; i < col; i++) {
-          if (guessLetters[i] === matchLetter && targetLetters[i] !== matchLetter) {
+          if (guessLetters[i] === normalizedLetter && targetLetters[i] !== normalizedLetter) {
             partialsBefore++;
           }
         }
@@ -72,16 +74,27 @@ export function GameBoard({
   };
 
   return (
-    <div className="grid grid-rows-6 gap-1.5 sm:gap-2 md:gap-3 p-1 sm:p-2 md:p-4 w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto">
+    <div
+      className={
+        compactLayout
+          ? 'grid grid-rows-6 gap-1.5 sm:gap-2 w-full max-w-[21rem] sm:max-w-[22.5rem] mx-auto p-0 sm:p-0.5'
+          : 'grid grid-rows-6 gap-1.5 sm:gap-2 md:gap-3 p-1 sm:p-2 md:p-4 w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto'
+      }
+    >
       {board.map((row, rowIndex) => (
         <div
           key={rowIndex}
-          className="grid grid-cols-5 gap-1.5 sm:gap-2 md:gap-3 justify-center"
+          className={
+            compactLayout
+              ? 'grid grid-cols-5 gap-1.5 sm:gap-2 justify-center'
+              : 'grid grid-cols-5 gap-1.5 sm:gap-2 md:gap-3 justify-center'
+          }
         >
           {row.map((letter, colIndex) => (
             <GameTile
               key={`${rowIndex}-${colIndex}`}
               letter={letter}
+              compact={compactLayout}
               state={getTileState(rowIndex, colIndex, letter)}
               isRevealing={
                 gameState.gameStatus === 'playing' &&

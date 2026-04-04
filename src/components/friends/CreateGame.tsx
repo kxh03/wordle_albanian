@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Share2, Copy } from 'lucide-react';
-import { KeyboardOverlay } from '@/components/game/KeyboardOverlay';
+import { GameScreenKeyboard } from '@/components/game/GameScreenKeyboard';
 import { GameHeader } from '@/components/game/GameHeader';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { encryptPayload } from '@/utils/crypto';
@@ -16,6 +16,7 @@ export function CreateGame() {
   const [creatorName, setCreatorName] = useState('');
   const [gameLink, setGameLink] = useState('');
   const [isWordValid, setIsWordValid] = useState<boolean | null>(null);
+  const [nameFieldFocused, setNameFieldFocused] = useState(false);
   const { toast } = useToast();
   const { config, t, language } = useLanguage();
   const apiLang = toApiLanguage(language);
@@ -43,7 +44,11 @@ export function CreateGame() {
       if (key === 'ENTER') {
         return;
       }
-      setWord((prev) => (prev.length < 5 ? (prev + key).toUpperCase() : prev));
+      setWord((prev) => {
+        if (prev.length >= 5) return prev;
+        const next = (prev + key).toUpperCase().normalize('NFC');
+        return next.slice(0, 5);
+      });
     },
     []
   );
@@ -153,11 +158,12 @@ export function CreateGame() {
   };
 
   return (
-    <div className="min-h-screen h-screen bg-gradient-subtle flex flex-col overflow-hidden overscroll-none">
+    <div className="h-dvh min-h-0 flex flex-col overflow-hidden overscroll-none bg-gradient-subtle">
       <GameHeader title="" showFriendsButton={false} />
 
-      <div className="flex-1 flex items-center justify-center p-2 sm:p-4 pb-0">
-        <Card className="w-full max-w-md touch-none" onTouchMove={(e) => e.preventDefault()}>
+      <div className="flex-1 min-h-0 flex flex-col w-full max-w-lg mx-auto px-2 sm:px-3">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex items-start justify-center py-2 sm:py-3">
+        <Card className="w-full max-w-md shrink-0">
           <CardHeader className="text-center">
             <CardTitle className="text-xl sm:text-2xl">{t.createGameForFriends}</CardTitle>
           </CardHeader>
@@ -174,7 +180,7 @@ export function CreateGame() {
                     setWord(normalized.slice(0, 5));
                   }}
                   maxLength={5}
-                  placeholder="FJALË"
+                  placeholder={language === 'english' ? 'CRANE' : 'FJALË'}
                   className={`text-center text-lg font-mono ${
                     word.length === 5
                       ? isWordValid === true
@@ -212,6 +218,8 @@ export function CreateGame() {
                 id="name"
                 value={creatorName}
                 onChange={(e) => setCreatorName(e.target.value)}
+                onFocus={() => setNameFieldFocused(true)}
+                onBlur={() => setNameFieldFocused(false)}
                 placeholder={language === 'english' ? 'Enter your name' : 'Shkruaj emrin'}
               />
             </div>
@@ -257,9 +265,12 @@ export function CreateGame() {
             )}
           </CardContent>
         </Card>
-      </div>
+        </div>
 
-      <KeyboardOverlay onKeyPress={handleVirtualKey} letterStates={new Map()} disabled={false} />
+        {!gameLink && !nameFieldFocused && (
+          <GameScreenKeyboard onKeyPress={handleVirtualKey} letterStates={new Map()} disabled={false} />
+        )}
+      </div>
     </div>
   );
 }

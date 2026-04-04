@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { GameBoard } from '@/components/game/GameBoard';
 import { GameHeader } from '@/components/game/GameHeader';
 import { HelpModal } from '@/components/game/HelpModal';
-import { KeyboardOverlay } from '@/components/game/KeyboardOverlay';
+import { GameScreenKeyboard } from '@/components/game/GameScreenKeyboard';
 import { useWordleGame } from '@/hooks/useWordleGame';
 import {
   getTodayDateString,
@@ -188,14 +188,11 @@ function DailySession({ gameId, targetToken, apiLang, hasPlayedToday, onGameFini
   }, [gameState, getTargetWord, language, toast]);
 
   return (
-    <>
-      <main
-        className="flex-1 flex flex-col items-center justify-start max-w-lg mx-auto w-full px-2 sm:px-4 py-2 sm:py-4 gap-1 sm:gap-2"
-        style={{ paddingBottom: '140px' }}
-      >
-        {hasPlayedToday ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4 w-full">
-            <div className="mb-4">
+    <div className="flex-1 min-h-0 flex flex-col w-full min-w-0">
+      {hasPlayedToday ? (
+        <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col items-center justify-start max-w-lg mx-auto w-full px-2 sm:px-4 py-2 gap-2">
+          <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4 w-full min-h-0 py-4">
+            <div className="mb-2">
               <h2 className="text-xl sm:text-2xl font-bold text-primary mb-2">
                 {language === 'english' ? "Today's Word Completed!" : 'Fjala e Ditës Përfunduar!'}
               </h2>
@@ -204,17 +201,18 @@ function DailySession({ gameId, targetToken, apiLang, hasPlayedToday, onGameFini
               </p>
             </div>
 
-            <div className="mt-2 sm:mt-4 mb-6 sm:mb-2">
+            <div className="my-2">
               <GameBoard
                 gameState={gameState}
                 revealingRow={undefined}
                 getTargetWord={getTargetWord}
                 isWordCompleteAnimating={isWordCompleteAnimating}
+                compactLayout
               />
             </div>
 
             {gameState.gameStatus === 'lost' && (
-              <div className="mb-6 text-center">
+              <div className="mb-4 text-center">
                 <div className="glass rounded-2xl p-4 sm:p-5 shadow-card">
                   <div className="text-4xl mb-3">😅</div>
                   <h2 className="text-lg sm:text-xl font-bold text-primary mb-1">
@@ -237,10 +235,13 @@ function DailySession({ gameId, targetToken, apiLang, hasPlayedToday, onGameFini
 
             <p className="text-sm text-muted-foreground">{t.comeBackTomorrow}</p>
           </div>
-        ) : (
-          <>
-            <div className="mt-2 sm:mt-4 mb-6 sm:mb-8">
+        </main>
+      ) : (
+        <>
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden px-2 py-0.5">
               <GameBoard
+                compactLayout
                 gameState={gameState}
                 revealingRow={isRevealing ? gameState.currentRow - 1 : undefined}
                 getTargetWord={getTargetWord}
@@ -249,40 +250,37 @@ function DailySession({ gameId, targetToken, apiLang, hasPlayedToday, onGameFini
             </div>
 
             {gameState.gameStatus !== 'playing' && (
-              <div className="mt-4 sm:mt-6 text-center space-y-3 sm:space-y-4">
+              <div className="shrink-0 max-h-[min(40dvh,280px)] overflow-y-auto overscroll-contain border-t border-border/50 px-3 py-2 text-center space-y-2 sm:space-y-3 bg-background/80">
                 {gameState.gameStatus === 'won' && (
-                  <div className="flex items-center justify-center gap-2 mb-3 sm:mb-4">
+                  <div className="flex items-center justify-center gap-2">
                     <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-                    <span className="text-base sm:text-lg font-semibold text-primary">
+                    <span className="text-sm sm:text-base font-semibold text-primary">
                       {t.congratulations} {gameState.currentRow + 1}/6
                     </span>
                     <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                   </div>
                 )}
 
-                <div className="flex gap-2 sm:gap-3">
-                  <Button onClick={shareResults} size="sm" className="flex-1 sm:size-lg">
+                <div className="flex gap-2 justify-center">
+                  <Button onClick={shareResults} size="sm" className="px-5">
                     <Share2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                     {t.share}
                   </Button>
                 </div>
 
-                <p className="text-xs sm:text-sm text-muted-foreground">{t.comeBackTomorrow}</p>
+                <p className="text-xs text-muted-foreground">{t.comeBackTomorrow}</p>
               </div>
             )}
-          </>
-        )}
-      </main>
+          </div>
 
-      {!hasPlayedToday && (
-        <KeyboardOverlay
-          onKeyPress={handleKeyPress}
-          letterStates={gameState.letterStates}
-          disabled={gameState.gameStatus !== 'playing'}
-        />
+          <GameScreenKeyboard
+            onKeyPress={handleKeyPress}
+            letterStates={gameState.letterStates}
+            disabled={gameState.gameStatus !== 'playing'}
+          />
+        </>
       )}
-
-    </>
+    </div>
   );
 }
 
@@ -339,7 +337,7 @@ export default function Daily() {
   }, [language]);
 
   return (
-    <div className="min-h-screen bg-gradient-subtle flex flex-col overflow-y-auto" style={{ minHeight: '100vh' }}>
+    <div className="h-dvh min-h-0 flex flex-col overflow-hidden bg-gradient-subtle">
       <GameHeader
         title=""
         showFriendsButton={true}
@@ -368,46 +366,48 @@ export default function Daily() {
         }
       />
 
-      <div className="w-full max-w-lg mx-auto px-2 sm:px-4 mb-2 sm:mb-4">
-        <Card className="bg-card/50 backdrop-blur-sm">
-          <CardContent className="flex items-center justify-between p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-              <div>
-                <p className="font-semibold text-sm sm:text-base">{t.todaysWord}</p>
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  {selectedDate ? formatDate(selectedDate, language) : getFormattedDate(language)}
-                </p>
+      <div className="flex-1 min-h-0 flex flex-col w-full max-w-lg mx-auto">
+        <div className="shrink-0 w-full px-2 sm:px-4 pt-1 pb-1 sm:pb-2">
+          <Card className="bg-card/50 backdrop-blur-sm">
+            <CardContent className="flex items-center justify-between p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                <div>
+                  <p className="font-semibold text-sm sm:text-base">{t.todaysWord}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    {selectedDate ? formatDate(selectedDate, language) : getFormattedDate(language)}
+                  </p>
+                </div>
               </div>
-            </div>
-            {hasPlayedToday && (
-              <div className="flex items-center gap-1 sm:gap-2">
-                <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-                <span className="text-xs sm:text-sm font-medium">{t.completed}</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              {hasPlayedToday && (
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                  <span className="text-xs sm:text-sm font-medium">{t.completed}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {sessionError && (
+          <p className="shrink-0 text-center text-destructive text-sm px-4 mb-1">{sessionError}</p>
+        )}
+
+        {!targetToken && !sessionError && (
+          <p className="shrink-0 text-center text-muted-foreground text-sm py-2">{t.loading}</p>
+        )}
+
+        {targetToken && (
+          <DailySession
+            key={gameId}
+            gameId={gameId}
+            targetToken={targetToken}
+            apiLang={apiLang}
+            hasPlayedToday={hasPlayedToday}
+            onGameFinished={onGameFinished}
+          />
+        )}
       </div>
-
-      {sessionError && (
-        <p className="text-center text-destructive text-sm px-4 mb-2">{sessionError}</p>
-      )}
-
-      {!targetToken && !sessionError && (
-        <p className="text-center text-muted-foreground text-sm mb-4">{t.loading}</p>
-      )}
-
-      {targetToken && (
-        <DailySession
-          key={gameId}
-          gameId={gameId}
-          targetToken={targetToken}
-          apiLang={apiLang}
-          hasPlayedToday={hasPlayedToday}
-          onGameFinished={onGameFinished}
-        />
-      )}
 
       <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
     </div>

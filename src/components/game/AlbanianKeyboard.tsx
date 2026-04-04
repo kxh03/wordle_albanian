@@ -9,9 +9,17 @@ interface AlbanianKeyboardProps {
   letterStates: Map<string, LetterState>;
   disabled?: boolean;
   className?: string;
+  /** Tighter keys and padding so the keyboard fits in the viewport with the grid (desktop + short windows). */
+  compact?: boolean;
 }
 
-export function AlbanianKeyboard({ onKeyPress, letterStates, disabled = false, className }: AlbanianKeyboardProps) {
+export function AlbanianKeyboard({
+  onKeyPress,
+  letterStates,
+  disabled = false,
+  className,
+  compact = false,
+}: AlbanianKeyboardProps) {
   const { config } = useLanguage();
   const getKeyVariant = (key: string) => {
     const state = letterStates.get(key);
@@ -56,17 +64,16 @@ export function AlbanianKeyboard({ onKeyPress, letterStates, disabled = false, c
         variant={getKeyVariant(key)}
         size="sm"
         className={cn(
-          // Enhanced keyboard styling
-          'shadow-keyboard font-bold w-full flex-1 min-w-0 h-10 sm:h-12 md:h-14 px-1 sm:px-2 md:px-3 text-[10px] sm:text-sm md:text-lg relative overflow-hidden',
-          // Touch feedback for mobile - enhanced for better mobile experience
+          'shadow-keyboard font-bold w-full flex-1 min-w-0 relative overflow-hidden',
           'active:scale-95 active:shadow-sm transition-all duration-150 ease-out touch-manipulation select-none',
-          // Better mobile tap targets
-          'min-h-[44px] sm:min-h-[48px]',
-          // Special key styling
-          isSpecial && 'px-2 sm:px-3 md:px-4 font-semibold',
-          // Multi-character key styling
-          key.length > 1 && key !== 'ENTER' && key !== 'BACKSPACE' && 'text-[9px] sm:text-xs md:text-base',
-          // Disabled state
+          compact
+            ? 'h-8 min-h-8 sm:h-9 sm:min-h-9 px-0.5 sm:px-1 text-[10px] sm:text-xs'
+            : 'h-10 sm:h-12 md:h-14 px-1 sm:px-2 md:px-3 text-[10px] sm:text-sm md:text-lg min-h-[44px] sm:min-h-[48px]',
+          isSpecial && (compact ? 'px-1 sm:px-2 font-semibold' : 'px-2 sm:px-3 md:px-4 font-semibold'),
+          key.length > 1 &&
+            key !== 'ENTER' &&
+            key !== 'BACKSPACE' &&
+            (compact ? 'text-[8px] sm:text-[10px]' : 'text-[9px] sm:text-xs md:text-base'),
           disabled && 'opacity-50 cursor-not-allowed'
         )}
         onClick={handleClick}
@@ -74,9 +81,9 @@ export function AlbanianKeyboard({ onKeyPress, letterStates, disabled = false, c
         style={{ flexGrow: isSpecial ? 1.4 : 1 }}
       >
         {key === 'BACKSPACE' ? (
-          <Delete className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5" />
+          <Delete className={compact ? 'w-3 h-3 sm:w-3.5 sm:h-3.5' : 'w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5'} />
         ) : key === 'ENTER' ? (
-          <CornerDownLeft className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5" />
+          <CornerDownLeft className={compact ? 'w-3 h-3 sm:w-3.5 sm:h-3.5' : 'w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5'} />
         ) : (
           <span>{key}</span>
         )}
@@ -87,14 +94,20 @@ export function AlbanianKeyboard({ onKeyPress, letterStates, disabled = false, c
   return (
     <div
       className={cn(
-        "w-full max-w-full md:max-w-4xl mx-auto px-2 py-3 sm:px-3 sm:py-4 md:px-4 md:py-5 glass-strong rounded-t-2xl md:rounded-2xl shadow-keyboard",
+        'w-full max-w-full mx-auto glass-strong shadow-keyboard',
+        compact
+          ? 'px-1 py-1.5 sm:px-2 sm:py-2 rounded-t-xl sm:rounded-xl'
+          : 'md:max-w-4xl px-2 py-3 sm:px-3 sm:py-4 md:px-4 md:py-5 rounded-t-2xl md:rounded-2xl',
         className
       )}
-      style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 12px)' }}
+      style={{ paddingBottom: compact ? 'max(env(safe-area-inset-bottom), 6px)' : 'max(env(safe-area-inset-bottom), 12px)' }}
     >
-      <div className="space-y-1 sm:space-y-2">
+      <div className={compact ? 'space-y-0.5 sm:space-y-1' : 'space-y-1 sm:space-y-2'}>
         {config.keyboardLayout.map((row, rowIndex) => (
-          <div key={rowIndex} className="flex justify-center gap-1 sm:gap-2 w-full">
+          <div
+            key={rowIndex}
+            className={cn('flex justify-center w-full', compact ? 'gap-0.5 sm:gap-1' : 'gap-1 sm:gap-2')}
+          >
             {row.map(renderKey)}
           </div>
         ))}

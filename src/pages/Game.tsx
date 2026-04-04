@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { GameBoard } from '@/components/game/GameBoard';
-import { KeyboardOverlay } from '@/components/game/KeyboardOverlay';
+import { GameScreenKeyboard } from '@/components/game/GameScreenKeyboard';
 import { GameHeader } from '@/components/game/GameHeader';
 import { useWordleGame } from '@/hooks/useWordleGame';
 import { useToast } from '@/hooks/use-toast';
@@ -119,10 +119,7 @@ export default function Game() {
   }, [gameState.gameStatus, gameState.currentRow, invalidReason, toast, getTargetWord, dismiss, t, language]);
 
   return (
-    <div
-      className="min-h-screen bg-gradient-subtle flex flex-col overflow-y-auto"
-      style={{ minHeight: '100vh' }}
-    >
+    <div className="h-dvh min-h-0 flex flex-col overflow-hidden bg-gradient-subtle">
       <GameHeader
         title=""
         onReset={() => {
@@ -130,66 +127,63 @@ export default function Game() {
         }}
       />
 
-      <main
-        className="flex-1 flex flex-col items-center justify-start max-w-lg mx-auto w-full px-2 sm:px-4 py-2 sm:py-4"
-        style={{ paddingBottom: '140px' }}
-      >
-        {loadError && (
-          <p className="text-destructive text-sm mb-4 text-center px-4">{loadError}</p>
-        )}
-        {!targetToken && !loadError && (
-          <p className="text-muted-foreground text-sm mb-4">{t.loading}</p>
-        )}
-        {targetToken && (
-          <div className="animate-float mt-2 sm:mt-4 mb-6 sm:mb-8">
-            <GameBoard
-              gameState={gameState}
-              revealingRow={isRevealing ? gameState.currentRow - 1 : undefined}
-              getTargetWord={getTargetWord}
-              isWordCompleteAnimating={isWordCompleteAnimating}
+      <div className="flex-1 min-h-0 flex flex-col w-full max-w-lg mx-auto">
+        {!targetToken ? (
+          <main className="flex-1 flex flex-col items-center justify-center px-4 py-6 text-center">
+            {loadError && <p className="text-destructive text-sm mb-4">{loadError}</p>}
+            {!loadError && <p className="text-muted-foreground text-sm">{t.loading}</p>}
+          </main>
+        ) : (
+          <>
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden px-2 py-0.5">
+                <GameBoard
+                  compactLayout
+                  gameState={gameState}
+                  revealingRow={isRevealing ? gameState.currentRow - 1 : undefined}
+                  getTargetWord={getTargetWord}
+                  isWordCompleteAnimating={isWordCompleteAnimating}
+                />
+              </div>
+
+              {gameState.gameStatus !== 'playing' && (
+                <div className="shrink-0 max-h-[min(42dvh,320px)] overflow-y-auto overscroll-contain border-t border-border/50 px-3 py-2 text-center space-y-3 bg-background/80">
+                  {gameState.gameStatus === 'lost' && (
+                    <div className="glass rounded-2xl p-4 shadow-card">
+                      <div className="text-3xl mb-2">😅</div>
+                      <h2 className="text-base sm:text-lg font-bold text-primary mb-1">
+                        {language === 'english' ? 'Better luck next time!' : 'Më keq këtë herë!'}
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        {language === 'english' ? 'The word was' : 'Fjala ishte'}{' '}
+                        <span className="font-bold text-primary">{getTargetWord()}</span>
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="glass rounded-2xl p-4 shadow-card animate-bounce-in">
+                    <Button
+                      onClick={() => {
+                        void loadSession();
+                      }}
+                      size="lg"
+                      className="px-8 py-3 text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                    >
+                      {t.newGame}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <GameScreenKeyboard
+              onKeyPress={handleKeyPress}
+              letterStates={gameState.letterStates}
+              disabled={gameState.gameStatus !== 'playing'}
             />
-          </div>
+          </>
         )}
-
-        {targetToken && gameState.gameStatus === 'lost' && (
-          <div className="mb-6 text-center">
-            <div className="glass rounded-2xl p-4 sm:p-5 shadow-card">
-              <div className="text-4xl mb-3">😅</div>
-              <h2 className="text-lg sm:text-xl font-bold text-primary mb-1">
-                {language === 'english' ? 'Better luck next time!' : 'Më keq këtë herë!'}
-              </h2>
-              <p className="text-sm sm:text-base text-muted-foreground">
-                {language === 'english' ? 'The word was' : 'Fjala ishte'}{' '}
-                <span className="font-bold text-primary">{getTargetWord()}</span>
-              </p>
-            </div>
-          </div>
-        )}
-
-        {targetToken && gameState.gameStatus !== 'playing' && (
-          <div className="mt-8 text-center space-y-4 animate-bounce-in">
-            <div className="glass rounded-2xl p-6 shadow-card">
-              <Button
-                onClick={() => {
-                  void loadSession();
-                }}
-                size="lg"
-                className="px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
-              >
-                {t.newGame}
-              </Button>
-            </div>
-          </div>
-        )}
-      </main>
-
-      {targetToken && (
-        <KeyboardOverlay
-          onKeyPress={handleKeyPress}
-          letterStates={gameState.letterStates}
-          disabled={gameState.gameStatus !== 'playing'}
-        />
-      )}
+      </div>
     </div>
   );
 }

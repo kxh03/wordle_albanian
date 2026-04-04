@@ -8,9 +8,19 @@ interface GameTileProps {
   delay?: number;
   isWordComplete?: boolean;
   wordCompleteDelay?: number;
+  /** Fixed sizing for all breakpoints so the grid fits above the keyboard on desktop (Wordle-style). */
+  compact?: boolean;
 }
 
-export function GameTile({ letter, state, isRevealing = false, delay = 0, isWordComplete = false, wordCompleteDelay = 0 }: GameTileProps) {
+export function GameTile({
+  letter,
+  state,
+  isRevealing = false,
+  delay = 0,
+  isWordComplete = false,
+  wordCompleteDelay = 0,
+  compact = false,
+}: GameTileProps) {
   const getStateClasses = () => {
     switch (state) {
       case 'correct':
@@ -27,8 +37,10 @@ export function GameTile({ letter, state, isRevealing = false, delay = 0, isWord
   return (
     <div 
       className={cn(
-        // Enhanced tile design with beautiful gradients and shadows
-        'w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 border-2 rounded-lg flex items-center justify-center font-bold text-lg sm:text-xl md:text-2xl transition-none shadow-tile transform relative overflow-hidden',
+        'border-2 rounded-md sm:rounded-lg flex items-center justify-center font-bold transition-none shadow-tile transform relative overflow-hidden',
+        compact
+          ? 'w-[3.25rem] h-[3.25rem] sm:w-[3.5rem] sm:h-[3.5rem] text-lg sm:text-xl'
+          : 'w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 text-lg sm:text-xl md:text-2xl',
         // Default state with gradient background
         state === 'unused' && !letter && 'bg-gradient-tile border-border hover:border-accent hover:shadow-card',
         // Typed letter state

@@ -30,7 +30,7 @@ export function GameHeader({
   
   return (
     <header 
-      className="w-full p-0 touch-none relative"
+      className="w-full shrink-0 p-0 touch-none relative"
       onTouchMove={(e) => e.preventDefault()}
     >
       <div className="flex items-center justify-between px-2 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 bg-gradient-hero text-[hsl(var(--primary-foreground))] shadow-header relative overflow-hidden">

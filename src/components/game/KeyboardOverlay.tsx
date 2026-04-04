@@ -7,9 +7,16 @@ interface KeyboardOverlayProps {
   onKeyPress: (key: string) => void;
   letterStates: Map<string, LetterState>;
   disabled?: boolean;
+  /** Show the overlay on fine-pointer devices too (e.g. Create Game word entry on desktop). */
+  alwaysShow?: boolean;
 }
 
-export function KeyboardOverlay({ onKeyPress, letterStates, disabled = false }: KeyboardOverlayProps) {
+export function KeyboardOverlay({
+  onKeyPress,
+  letterStates,
+  disabled = false,
+  alwaysShow = false,
+}: KeyboardOverlayProps) {
   const [isTouch, setIsTouch] = useState(true);
   const [suppressForInputFocus, setSuppressForInputFocus] = useState(false);
 
@@ -38,7 +45,8 @@ export function KeyboardOverlay({ onKeyPress, letterStates, disabled = false }: 
     };
   }, []);
 
-  if (!isTouch || suppressForInputFocus) {
+  const allowOverlay = alwaysShow || isTouch;
+  if (!allowOverlay || suppressForInputFocus) {
     return null;
   }
 
