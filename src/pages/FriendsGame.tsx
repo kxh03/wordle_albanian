@@ -158,7 +158,7 @@ export default function FriendsGame() {
     if (!customGame) return;
     if (invalidReason === 'not_in_dictionary') {
       toast({
-        title: customGame.language === 'english' ? 'Word not in dictionary' : 'Fjalë nuk është në fjalorë',
+        title: customGame.language === 'english' ? 'Word not in dictionary' : 'Kjo fjalë nuk është në fjalorin tonë. Ju lutemi provoni një fjalë tjetër.',
         description:
           customGame.language === 'english'
             ? 'Please enter a valid 5-letter word.'

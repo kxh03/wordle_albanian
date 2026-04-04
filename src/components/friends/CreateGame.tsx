@@ -207,7 +207,7 @@ export function CreateGame() {
                 <p className="text-sm text-red-600">
                   {language === 'english'
                     ? 'This word is not in our dictionary. Please try another word.'
-                    : 'Kjo fjalë nuk është në fjalorën tonë. Ju lutemi provoni një fjalë tjetër.'}
+                    : 'Kjo fjalë nuk është në fjalorin tonë. Ju lutemi provoni një fjalë tjetër.'}
                 </p>
               )}
             </div>

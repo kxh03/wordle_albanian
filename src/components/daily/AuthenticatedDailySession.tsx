@@ -101,7 +101,7 @@ export function AuthenticatedDailySession({
   useEffect(() => {
     if (invalidReason === 'not_in_dictionary') {
       toast({
-        title: language === 'english' ? 'Word not in dictionary' : 'Fjalë nuk është në fjalorë',
+        title: language === 'english' ? 'Word not in dictionary' : 'Kjo fjalë nuk është në fjalorin tonë. Ju lutemi provoni një fjalë tjetër.',
         description:
           language === 'english'
             ? 'Please enter a valid 5-letter word.'
