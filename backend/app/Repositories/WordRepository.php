@@ -25,11 +25,13 @@ class WordRepository
             return 0;
         }
 
-        Word::query()->upsert(
-            $payload,
-            ['normalized_word', 'language'],
-            ['word']
-        );
+        foreach (array_chunk($payload, 1500) as $chunk) {
+            Word::query()->upsert(
+                $chunk,
+                ['normalized_word', 'language'],
+                ['word']
+            );
+        }
 
         $this->wordCacheService->forget($language);
 

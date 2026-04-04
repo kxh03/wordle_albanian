@@ -55,6 +55,11 @@ class WordImportService
 
     private function readDictionaryFile(string $path): string
     {
+        $resourcePath = resource_path($path);
+        if (File::exists($resourcePath)) {
+            return File::get($resourcePath);
+        }
+
         if (Storage::disk('local')->exists($path)) {
             return Storage::disk('local')->get($path);
         }
