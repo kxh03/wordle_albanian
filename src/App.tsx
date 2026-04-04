@@ -10,6 +10,8 @@ import Daily from "./pages/Daily";
 import FriendsGame from "./pages/FriendsGame";
 import { CreateGame } from "./components/friends/CreateGame";
 import NotFound from "./pages/NotFound";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
 
 const queryClient = new QueryClient();
 
@@ -24,6 +26,8 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/game" element={<Game />} />
             <Route path="/daily" element={<Daily />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
             <Route path="/friends" element={<CreateGame />} />
             <Route path="/friends/:gameId" element={<FriendsGame />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
