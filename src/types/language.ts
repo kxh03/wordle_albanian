@@ -17,6 +17,9 @@ export interface Translations {
   freeGame: string;
   friends: string;
   resetGame: string;
+  login: string;
+  register: string;
+  logout: string;
   
   // Daily Game
   todaysWord: string;

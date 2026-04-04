@@ -34,10 +34,7 @@ const Index = () => {
               <Button 
                 size="lg" 
                 className="w-full hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl cursor-pointer"
-                onClick={() => {
-                  console.log('Navigating to /daily');
-                  navigate('/daily');
-                }}
+                onClick={() => navigate('/daily')}
               >
                 {t.playToday}
               </Button>
@@ -59,10 +56,7 @@ const Index = () => {
                 size="lg" 
                 variant="outline" 
                 className="w-full hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl hover:bg-primary hover:text-primary-foreground cursor-pointer"
-                onClick={() => {
-                  console.log('Navigating to /game');
-                  navigate('/game');
-                }}
+                onClick={() => navigate('/game')}
               >
                 {t.startGame}
               </Button>
@@ -84,10 +78,7 @@ const Index = () => {
                 size="lg" 
                 variant="outline" 
                 className="w-full hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl hover:bg-primary hover:text-primary-foreground cursor-pointer"
-                onClick={() => {
-                  console.log('Navigating to /friends');
-                  navigate('/friends');
-                }}
+                onClick={() => navigate('/friends')}
               >
                 {t.createGameButton}
               </Button>

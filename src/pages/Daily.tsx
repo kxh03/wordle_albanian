@@ -20,6 +20,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar as CalendarUI } from '@/components/ui/calendar';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { postGamesDaily, toApiLanguage, type ApiLanguage } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
+import { useDailyGame } from '@/hooks/useDailyGame';
+import { useStats } from '@/hooks/useStats';
+import { DailyCalendarModal } from '@/components/daily/DailyCalendarModal';
+import { AuthenticatedDailySession } from '@/components/daily/AuthenticatedDailySession';
 
 type DailySessionProps = {
   gameId: string;
@@ -29,7 +34,7 @@ type DailySessionProps = {
   onGameFinished: () => void;
 };
 
-function DailySession({ gameId, targetToken, apiLang, hasPlayedToday, onGameFinished }: DailySessionProps) {
+function GuestDailySession({ gameId, targetToken, apiLang, hasPlayedToday, onGameFinished }: DailySessionProps) {
   const { toast, dismiss } = useToast();
   const { language, t, config } = useLanguage();
   const { gameState, isRevealing, isWordCompleteAnimating, handleKeyPress, invalidReason, getTargetWord } =
@@ -175,11 +180,11 @@ function DailySession({ gameId, targetToken, apiLang, hasPlayedToday, onGameFini
         : `Wordle Shqip ${getTodayDateString()}\n${attempts}/6\n\n${grid}\n#WordleShqip`;
 
     if (navigator.share) {
-      navigator.share({
+      void navigator.share({
         text: shareText,
       });
     } else {
-      navigator.clipboard.writeText(shareText);
+      void navigator.clipboard.writeText(shareText);
       toast({
         title: language === 'english' ? 'Copied!' : 'U kopjua!',
         description: language === 'english' ? 'Results copied to clipboard.' : 'Rezultatet u kopjuan në clipboard.',
@@ -216,10 +221,10 @@ function DailySession({ gameId, targetToken, apiLang, hasPlayedToday, onGameFini
                 <div className="glass rounded-2xl p-4 sm:p-5 shadow-card">
                   <div className="text-4xl mb-3">😅</div>
                   <h2 className="text-lg sm:text-xl font-bold text-primary mb-1">
-                    {language === 'english' ? 'You did not find today\'s word.' : 'Nuk e gjetët fjalën e ditës.'}
+                    {language === 'english' ? "You did not find today's word." : 'Nuk e gjetët fjalën e ditës.'}
                   </h2>
                   <p className="text-sm sm:text-base text-muted-foreground">
-                    {language === 'english' ? 'Today\'s word was' : 'Fjala e sotme ishte'}{' '}
+                    {language === 'english' ? "Today's word was" : 'Fjala e sotme ishte'}{' '}
                     <span className="font-bold text-primary">{getTargetWord()}</span>
                   </p>
                 </div>
@@ -287,24 +292,32 @@ function DailySession({ gameId, targetToken, apiLang, hasPlayedToday, onGameFini
 export default function Daily() {
   const { t, language } = useLanguage();
   const apiLang = toApiLanguage(language);
+  const { user, isAuthenticated, isBootstrapping, hasToken } = useAuth();
+  const { data: statsData } = useStats(apiLang, isAuthenticated);
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [hasPlayedToday, setHasPlayedToday] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [targetToken, setTargetToken] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   const playDateStr = selectedDate ? getDateString(selectedDate) : getTodayDateString();
   const gameId = `daily-${playDateStr}-${language}`;
+
+  const readOnlyArchive = playDateStr < getTodayDateString();
+
+  const dailyQuery = useDailyGame(apiLang, playDateStr, isAuthenticated);
 
   const onGameFinished = useCallback(() => {
     setHasPlayedToday(true);
   }, []);
 
   useEffect(() => {
+    if (isAuthenticated) return;
     let cancelled = false;
     setSessionError(null);
-    (async () => {
+    void (async () => {
       try {
         const s = await postGamesDaily(apiLang, playDateStr);
         if (!cancelled) {
@@ -320,9 +333,10 @@ export default function Daily() {
     return () => {
       cancelled = true;
     };
-  }, [language, playDateStr, apiLang]);
+  }, [language, playDateStr, apiLang, isAuthenticated]);
 
   useEffect(() => {
+    if (isAuthenticated) return;
     const completedToday = localStorage.getItem(`daily-completed-${getTodayDateString()}-${language}`);
     setHasPlayedToday(!!completedToday);
 
@@ -334,36 +348,67 @@ export default function Daily() {
       });
       markTodayAsPlayed();
     }
-  }, [language]);
+  }, [language, isAuthenticated]);
+
+  if (hasToken && isBootstrapping && !user) {
+    return (
+      <div className="h-dvh min-h-0 flex flex-col overflow-hidden bg-gradient-subtle">
+        <GameHeader title="" showFriendsButton showHomeButton onHelpClick={() => setShowHelp(true)} />
+        <p className="flex-1 flex items-center justify-center text-muted-foreground text-sm">{t.loading}</p>
+        <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
+      </div>
+    );
+  }
+
+  const calendarButton = isAuthenticated ? (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="text-muted-foreground hover:text-foreground"
+      onClick={() => setCalendarOpen(true)}
+    >
+      <Calendar className="w-4 h-4" />
+    </Button>
+  ) : (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+          <Calendar className="w-4 h-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="end">
+        <CalendarUI
+          mode="single"
+          selected={selectedDate ?? new Date()}
+          onSelect={(date) => {
+            if (!date) return;
+            setSelectedDate(date);
+          }}
+          disabled={(date) => date > new Date()}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  );
 
   return (
     <div className="h-dvh min-h-0 flex flex-col overflow-hidden bg-gradient-subtle">
+      <DailyCalendarModal
+        open={calendarOpen}
+        onOpenChange={setCalendarOpen}
+        language={apiLang}
+        uiLang={language}
+        onSelectDate={(d) => setSelectedDate(d)}
+      />
+
       <GameHeader
         title=""
         showFriendsButton={true}
         showHomeButton={true}
         onHelpClick={() => setShowHelp(true)}
-        rightSlot={
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-                <Calendar className="w-4 h-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <CalendarUI
-                mode="single"
-                selected={selectedDate ?? new Date()}
-                onSelect={(date) => {
-                  if (!date) return;
-                  setSelectedDate(date);
-                }}
-                disabled={(date) => date > new Date()}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-        }
+        streakCount={isAuthenticated ? statsData?.current_streak ?? 0 : undefined}
+        rightSlot={calendarButton}
       />
 
       <div className="flex-1 min-h-0 flex flex-col w-full max-w-lg mx-auto">
@@ -379,7 +424,7 @@ export default function Daily() {
                   </p>
                 </div>
               </div>
-              {hasPlayedToday && (
+              {(isAuthenticated ? dailyQuery.data?.is_completed : hasPlayedToday) && (
                 <div className="flex items-center gap-1 sm:gap-2">
                   <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                   <span className="text-xs sm:text-sm font-medium">{t.completed}</span>
@@ -389,16 +434,38 @@ export default function Daily() {
           </Card>
         </div>
 
-        {sessionError && (
+        {isAuthenticated && dailyQuery.isError && (
+          <p className="shrink-0 text-center text-destructive text-sm px-4 mb-1">
+            {dailyQuery.error instanceof Error ? dailyQuery.error.message : 'Could not load daily game'}
+          </p>
+        )}
+
+        {sessionError && !isAuthenticated && (
           <p className="shrink-0 text-center text-destructive text-sm px-4 mb-1">{sessionError}</p>
         )}
 
-        {!targetToken && !sessionError && (
+        {isAuthenticated && dailyQuery.isPending && (
           <p className="shrink-0 text-center text-muted-foreground text-sm py-2">{t.loading}</p>
         )}
 
-        {targetToken && (
-          <DailySession
+        {isAuthenticated && user && dailyQuery.data && (
+          <AuthenticatedDailySession
+            key={`${playDateStr}-${apiLang}`}
+            playDateStr={playDateStr}
+            apiLang={apiLang}
+            dto={dailyQuery.data}
+            readOnlyArchive={readOnlyArchive}
+            submitGuess={dailyQuery.guess}
+            guessPending={dailyQuery.guessState.isPending}
+          />
+        )}
+
+        {!isAuthenticated && !targetToken && !sessionError && (
+          <p className="shrink-0 text-center text-muted-foreground text-sm py-2">{t.loading}</p>
+        )}
+
+        {!isAuthenticated && targetToken && (
+          <GuestDailySession
             key={gameId}
             gameId={gameId}
             targetToken={targetToken}
