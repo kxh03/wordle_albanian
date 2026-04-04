@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Generated when running scripts/build_dictionaries.py (optional dwyl corpus)
+scripts/cache/
