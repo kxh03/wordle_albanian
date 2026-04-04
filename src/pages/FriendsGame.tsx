@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { GameBoard } from '@/components/game/GameBoard';
-import { KeyboardOverlay } from '@/components/game/KeyboardOverlay';
+import { GameScreenKeyboard } from '@/components/game/GameScreenKeyboard';
 import { GameHeader } from '@/components/game/GameHeader';
 import { useWordleGame } from '@/hooks/useWordleGame';
 import { useToast } from '@/hooks/use-toast';
@@ -185,10 +185,7 @@ export default function FriendsGame() {
   }
 
   return (
-    <div
-      className="min-h-screen h-screen bg-gradient-subtle flex flex-col overflow-y-auto overscroll-contain"
-      style={{ minHeight: '100vh', height: '100vh' }}
-    >
+    <div className="h-dvh min-h-0 flex flex-col overflow-hidden bg-gradient-subtle overscroll-contain">
       <GameHeader
         title=""
         onReset={() => resetGame(customGame.word)}
@@ -196,127 +193,125 @@ export default function FriendsGame() {
         creatorName={customGame.creatorName}
       />
 
-      <main
-        className="flex-1 flex flex-col items-center justify-start max-w-lg mx-auto w-full px-2 sm:px-4 py-2 sm:py-4 relative"
-        style={{ paddingBottom: 'clamp(180px, 32vh, 300px)' }}
-      >
-        {gameState.gameStatus === 'won' && (
-          <div className="mb-3 sm:mb-4 text-center animate-victory-bounce w-full max-w-sm mx-auto">
-            <div className="glass rounded-2xl p-4 sm:p-6 shadow-card animate-celebration-pulse relative">
-              <div className="text-4xl sm:text-5xl mb-2 sm:mb-3 animate-bounce">🎉</div>
-              <h2 className="text-xl sm:text-2xl font-bold text-correct mb-1 sm:mb-2">{t.youWon}</h2>
-              <p className="text-sm sm:text-base text-muted-foreground">
-                {t.youGuessedWord} {customGame.creatorName}!
-              </p>
-              <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
-                <div
-                  className="absolute top-0 left-1/4 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-yellow-400 rounded-full animate-confetti"
-                  style={{ animationDelay: '0s' }}
-                ></div>
-                <div
-                  className="absolute top-0 left-1/2 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-400 rounded-full animate-confetti"
-                  style={{ animationDelay: '0.2s' }}
-                ></div>
-                <div
-                  className="absolute top-0 left-3/4 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-400 rounded-full animate-confetti"
-                  style={{ animationDelay: '0.4s' }}
-                ></div>
+      <div className="flex-1 min-h-0 flex flex-col w-full max-w-lg mx-auto">
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden px-2 py-0.5">
+            <GameBoard
+              compactLayout
+              gameState={gameState}
+              revealingRow={isRevealing ? gameState.currentRow - 1 : undefined}
+              getTargetWord={getTargetWord}
+              isWordCompleteAnimating={isWordCompleteAnimating}
+            />
+          </div>
+
+          {gameState.gameStatus !== 'playing' && (
+            <div className="shrink-0 max-h-[min(40dvh,340px)] overflow-y-auto overscroll-contain border-t border-border/50 px-2 py-2 text-center space-y-3 bg-background/80">
+              {gameState.gameStatus === 'won' && (
+                <div className="animate-victory-bounce w-full max-w-sm mx-auto">
+                  <div className="glass rounded-2xl p-3 sm:p-4 shadow-card animate-celebration-pulse relative">
+                    <div className="text-3xl sm:text-4xl mb-1 sm:mb-2 animate-bounce">🎉</div>
+                    <h2 className="text-lg sm:text-xl font-bold text-correct mb-1">{t.youWon}</h2>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      {t.youGuessedWord} {customGame.creatorName}!
+                    </p>
+                    <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
+                      <div
+                        className="absolute top-0 left-1/4 w-1.5 h-1.5 bg-yellow-400 rounded-full animate-confetti"
+                        style={{ animationDelay: '0s' }}
+                      />
+                      <div
+                        className="absolute top-0 left-1/2 w-1.5 h-1.5 bg-green-400 rounded-full animate-confetti"
+                        style={{ animationDelay: '0.2s' }}
+                      />
+                      <div
+                        className="absolute top-0 left-3/4 w-1.5 h-1.5 bg-blue-400 rounded-full animate-confetti"
+                        style={{ animationDelay: '0.4s' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {gameState.gameStatus === 'lost' && (
+                <div className="animate-bounce-in">
+                  <div className="glass rounded-2xl p-3 sm:p-4 shadow-card">
+                    <div className="text-3xl mb-2">😅</div>
+                    <h2 className="text-base sm:text-lg font-bold text-primary mb-1">{t.betterLuckNextTime}</h2>
+                    <p className="text-sm text-muted-foreground">
+                      {t.theWordWas} &quot;<span className="font-bold text-primary">{getTargetWord()}</span>&quot;
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 sm:gap-3 justify-center animate-bounce-in" style={{ animationDelay: '0.15s' }}>
+                <Button
+                  onClick={() => {
+                    const attempts = gameState.gameStatus === 'won' ? gameState.currentRow + 1 : 'X';
+                    let grid = '';
+                    for (let row = 0; row < Math.min(gameState.currentRow + 1, 6); row++) {
+                      for (let col = 0; col < 5; col++) {
+                        const letter = gameState.board[row][col];
+                        if (!letter) continue;
+
+                        if (letter === getTargetWord()[col]) {
+                          grid += '🟩';
+                        } else if (getTargetWord().includes(letter)) {
+                          grid += '🟨';
+                        } else {
+                          grid += '⬛';
+                        }
+                      }
+                      grid += '\n';
+                    }
+
+                    const shareText =
+                      customGame.language === 'english'
+                        ? `I ${gameState.gameStatus === 'won' ? 'solved' : 'tried'} ${customGame.creatorName}'s word challenge!\n${attempts}/6\n\n${grid}\n#WordleChallenge`
+                        : `${gameState.gameStatus === 'won' ? 'E zgjidha' : 'E provova'} sfidën e ${customGame.creatorName}!\n${attempts}/6\n\n${grid}\n#SfidaFjalesh`;
+
+                    if (navigator.share) {
+                      navigator.share({ text: shareText });
+                    } else {
+                      navigator.clipboard.writeText(shareText);
+                      toast({
+                        title: customGame.language === 'english' ? 'Copied!' : 'U kopjua!',
+                        description: customGame.language === 'english' ? 'Results copied to clipboard.' : 'Rezultatet u kopjuan.',
+                      });
+                    }
+                  }}
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 max-w-32"
+                >
+                  <Share2 className="w-4 h-4 mr-2" />
+                  {customGame.language === 'english' ? 'Share' : 'Ndaj'}
+                </Button>
+
+                <Button onClick={() => resetGame(customGame.word)} size="sm" variant="outline" className="flex-1 max-w-32">
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  {customGame.language === 'english' ? 'Try Again' : 'Provo Sërish'}
+                </Button>
+              </div>
+
+              <div className="glass rounded-xl p-2 shadow-sm">
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  {customGame.language === 'english'
+                    ? `Challenge from ${customGame.creatorName}`
+                    : `Sfida nga ${customGame.creatorName}`}
+                </p>
               </div>
             </div>
-          </div>
-        )}
-
-        {gameState.gameStatus === 'lost' && (
-          <div className="mb-3 sm:mb-4 text-center animate-bounce-in">
-            <div className="glass rounded-2xl p-4 sm:p-5 shadow-card">
-              <div className="text-4xl mb-3">😅</div>
-              <h2 className="text-xl font-bold text-primary mb-2">{t.betterLuckNextTime}</h2>
-              <p className="text-base text-muted-foreground">
-                {t.theWordWas} "<span className="font-bold text-primary">{getTargetWord()}</span>"
-              </p>
-            </div>
-          </div>
-        )}
-
-        <div className={`mt-2 sm:mt-4 mb-6 sm:mb-8 ${gameState.gameStatus === 'playing' ? 'animate-float' : ''}`}>
-          <GameBoard
-            gameState={gameState}
-            revealingRow={isRevealing ? gameState.currentRow - 1 : undefined}
-            getTargetWord={getTargetWord}
-            isWordCompleteAnimating={isWordCompleteAnimating}
-          />
+          )}
         </div>
 
-        {gameState.gameStatus !== 'playing' && (
-          <div className="mt-6 text-center space-y-3 animate-bounce-in" style={{ animationDelay: '0.3s' }}>
-            <div className="flex gap-3 justify-center">
-              <Button
-                onClick={() => {
-                  const attempts = gameState.gameStatus === 'won' ? gameState.currentRow + 1 : 'X';
-                  let grid = '';
-                  for (let row = 0; row < Math.min(gameState.currentRow + 1, 6); row++) {
-                    for (let col = 0; col < 5; col++) {
-                      const letter = gameState.board[row][col];
-                      if (!letter) continue;
-
-                      if (letter === getTargetWord()[col]) {
-                        grid += '🟩';
-                      } else if (getTargetWord().includes(letter)) {
-                        grid += '🟨';
-                      } else {
-                        grid += '⬛';
-                      }
-                    }
-                    grid += '\n';
-                  }
-
-                  const shareText =
-                    customGame.language === 'english'
-                      ? `I ${gameState.gameStatus === 'won' ? 'solved' : 'tried'} ${customGame.creatorName}'s word challenge!\n${attempts}/6\n\n${grid}\n#WordleChallenge`
-                      : `${gameState.gameStatus === 'won' ? 'E zgjidha' : 'E provova'} sfidën e ${customGame.creatorName}!\n${attempts}/6\n\n${grid}\n#SfidaFjalesh`;
-
-                  if (navigator.share) {
-                    navigator.share({ text: shareText });
-                  } else {
-                    navigator.clipboard.writeText(shareText);
-                    toast({
-                      title: customGame.language === 'english' ? 'Copied!' : 'U kopjua!',
-                      description: customGame.language === 'english' ? 'Results copied to clipboard.' : 'Rezultatet u kopjuan.',
-                    });
-                  }
-                }}
-                size="sm"
-                variant="outline"
-                className="flex-1 max-w-32"
-              >
-                <Share2 className="w-4 h-4 mr-2" />
-                {customGame.language === 'english' ? 'Share' : 'Ndaj'}
-              </Button>
-
-              <Button onClick={() => resetGame(customGame.word)} size="sm" variant="outline" className="flex-1 max-w-32">
-                <RotateCcw className="w-4 h-4 mr-2" />
-                {customGame.language === 'english' ? 'Try Again' : 'Provo Sërish'}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        <div className="mt-4 text-center">
-          <div className="glass rounded-xl p-3 shadow-sm">
-            <p className="text-sm text-muted-foreground">
-              {customGame.language === 'english'
-                ? `Challenge from ${customGame.creatorName}`
-                : `Sfida nga ${customGame.creatorName}`}
-            </p>
-          </div>
-        </div>
-      </main>
-
-      <KeyboardOverlay
-        onKeyPress={handleKeyPress}
-        letterStates={gameState.letterStates}
-        disabled={gameState.gameStatus !== 'playing'}
-      />
+        <GameScreenKeyboard
+          onKeyPress={handleKeyPress}
+          letterStates={gameState.letterStates}
+          disabled={gameState.gameStatus !== 'playing'}
+        />
+      </div>
     </div>
   );
 }
