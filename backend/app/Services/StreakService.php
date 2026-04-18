@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\DailyGame;
 use App\Models\User;
 use App\Models\UserStat;
 use Illuminate\Support\Carbon;
@@ -18,36 +17,42 @@ class StreakService
     }
 
     /**
-     * Called once when a daily game is marked completed (win or loss).
+     * Called once per day on the first daily guess attempt.
      */
-    public function onDailyCompleted(User $user, Carbon $gameDate, bool $won): void
+    public function onDailyPlayed(User $user, Carbon $gameDate): void
     {
         $stats = $this->ensureStats($user);
-        $dateStr = $gameDate->toDateString();
+        $playDate = $gameDate->copy()->startOfDay();
+        $lastPlayed = $stats->last_played_date?->copy()->startOfDay();
 
-        if ($won) {
-            $yesterday = $gameDate->copy()->subDay()->toDateString();
-            $wonYesterday = DailyGame::query()
-                ->where('user_id', $user->id)
-                ->whereDate('game_date', $yesterday)
-                ->where('is_completed', true)
-                ->where('is_won', true)
-                ->exists();
+        if ($lastPlayed !== null) {
+            $dayDiff = $playDate->diffInDays($lastPlayed, false);
 
-            if ($wonYesterday) {
+            // Same day: already counted.
+            if ($dayDiff === 0) {
+                return;
+            }
+
+            // Ignore out-of-order past-day replays for streak progression.
+            if ($dayDiff < 0) {
+                return;
+            }
+
+            if ($dayDiff === 1) {
                 $stats->current_streak = $stats->current_streak + 1;
             } else {
+                // Missed at least two days: restart from today's play.
                 $stats->current_streak = 1;
             }
-
-            if ($stats->current_streak > $stats->max_streak) {
-                $stats->max_streak = $stats->current_streak;
-            }
         } else {
-            $stats->current_streak = 0;
+            $stats->current_streak = 1;
         }
 
-        $stats->last_played_date = $dateStr;
+        if ($stats->current_streak > $stats->max_streak) {
+            $stats->max_streak = $stats->current_streak;
+        }
+
+        $stats->last_played_date = $playDate->toDateString();
         $stats->save();
     }
 }
