@@ -132,7 +132,8 @@ class DailyGameService
             $isWin,
             $nextAttemptNumber,
             $shouldComplete,
-            $targetUpper
+            $targetUpper,
+            $date
         ): array {
             Guess::query()->create([
                 'user_id' => $user->id,
@@ -145,6 +146,12 @@ class DailyGameService
             ]);
 
             $game->attempts_used = $nextAttemptNumber;
+            if ($nextAttemptNumber === 1) {
+                $this->streakService->onDailyPlayed(
+                    $user,
+                    Carbon::parse($date)
+                );
+            }
 
             $payload = [
                 'result' => $result,
@@ -158,12 +165,6 @@ class DailyGameService
                 $game->is_won = $isWin;
                 $game->completed_at = now();
                 $game->save();
-
-                $this->streakService->onDailyCompleted(
-                    $user,
-                    Carbon::parse($game->game_date->toDateString()),
-                    $isWin
-                );
 
                 $payload['is_completed'] = true;
                 $payload['is_won'] = $isWin;
@@ -180,7 +181,7 @@ class DailyGameService
     /**
      * @return array<string, mixed>
      */
-    public function formatGameState(DailyGame $game): array
+    public function formatGameState(DailyGame $game, bool $revealUnplayedAnswer = false): array
     {
         $game->load(['guesses' => fn ($q) => $q->orderBy('guess_number'), 'word']);
 
@@ -192,6 +193,8 @@ class DailyGameService
 
         $answer = null;
         if ($game->is_completed && $game->word) {
+            $answer = mb_strtoupper($game->word->word, 'UTF-8');
+        } elseif ($revealUnplayedAnswer && ! $game->is_completed && $game->attempts_used === 0 && $game->word) {
             $answer = mb_strtoupper($game->word->word, 'UTF-8');
         }
 
