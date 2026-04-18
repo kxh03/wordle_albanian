@@ -181,11 +181,23 @@ export function AuthenticatedDailySession({
   if (readOnlyArchive && !dto.is_completed) {
     return (
       <main className="flex-1 min-h-0 flex flex-col items-center justify-center px-4 text-center text-muted-foreground">
-        <p className="text-sm">
-          {language === 'english'
-            ? 'No completed game on this date.'
-            : 'Nuk ka lojë të përfunduar në këtë datë.'}
-        </p>
+        {dto.target_word ? (
+          <div className="glass rounded-2xl p-4 sm:p-5 shadow-card max-w-sm w-full">
+            <p className="text-sm text-muted-foreground mb-1">
+              {language === 'english' ? 'No game played on this date.' : 'Nuk ka lojë të luajtur në këtë datë.'}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {language === 'english' ? 'Word of the day:' : 'Fjala e ditës:'}{' '}
+              <span className="font-bold text-primary">{dto.target_word}</span>
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm">
+            {language === 'english'
+              ? 'No completed game on this date.'
+              : 'Nuk ka lojë të përfunduar në këtë datë.'}
+          </p>
+        )}
       </main>
     );
   }

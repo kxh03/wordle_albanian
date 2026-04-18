@@ -305,9 +305,12 @@ export default function Daily() {
   const playDateStr = selectedDate ? getDateString(selectedDate) : getTodayDateString();
   const gameId = `daily-${playDateStr}-${language}`;
 
-  const readOnlyArchive = playDateStr < getTodayDateString();
-
   const dailyQuery = useDailyGame(apiLang, playDateStr, isAuthenticated);
+
+  const readOnlyArchive =
+    isAuthenticated &&
+    playDateStr < getTodayDateString() &&
+    Boolean(dailyQuery.data?.is_completed);
 
   const onGameFinished = useCallback(() => {
     setHasPlayedToday(true);
