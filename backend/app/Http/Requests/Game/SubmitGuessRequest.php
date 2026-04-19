@@ -18,6 +18,12 @@ class SubmitGuessRequest extends FormRequest
             'guess' => ['required', 'string', 'size:5'],
             'target_token' => ['required', 'string'],
             'is_last_row' => ['sometimes', 'boolean'],
+            'hard_mode' => ['sometimes', 'boolean'],
+            'time_up' => ['sometimes', 'boolean'],
+            'correct_positions' => ['sometimes', 'array'],
+            'correct_positions.*' => ['string', 'size:1'],
+            'required_letters' => ['sometimes', 'array'],
+            'required_letters.*' => ['string', 'size:1'],
         ];
     }
 }
