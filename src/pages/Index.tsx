@@ -6,7 +6,7 @@ import { Play, Users, Info, Calendar } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 const Index = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
   
   return (
@@ -122,6 +122,26 @@ const Index = () => {
                 <h3 className="font-semibold mb-2">{t.wrong}</h3>
                 <p className="text-sm text-muted-foreground">
                   {t.wrongDescription}
+                </p>
+              </div>
+            </div>
+
+            <div className="border-t border-border/60 pt-4 space-y-3">
+              <div>
+                <h3 className="font-semibold">🔥 {language === 'english' ? 'Hard Mode' : 'Mënyra e Vështirë'}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {language === 'english'
+                    ? 'Green letters must stay in the same position, and yellow letters must be used in the next guesses.'
+                    : 'Shkronjat jeshile duhet të mbeten në të njëjtin pozicion, ndërsa shkronjat e verdha duhet të përdoren në tentativat e radhës.'}
+                </p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold">⏱️ {language === 'english' ? 'Timed Mode' : 'Mënyra me Kohë'}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {language === 'english'
+                    ? 'You choose your own time limit in seconds before starting. When time reaches zero, the game is lost and the word is revealed.'
+                    : 'Lojtari vendos vetë kohën në sekonda para nisjes. Kur koha shkon në zero, loja humbet dhe zbulohet fjala.'}
                 </p>
               </div>
             </div>
