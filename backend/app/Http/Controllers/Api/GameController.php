@@ -57,8 +57,33 @@ class GameController extends Controller
             Crypt::decryptString($request->string('target_token')->toString()),
             'UTF-8'
         );
+        $isTimeUp = $request->boolean('time_up');
+        $isHardMode = $request->boolean('hard_mode');
 
-        if (! $this->wordValidationService->exists($language, $guess)) {
+        if ($isHardMode) {
+            $correctPositions = $request->input('correct_positions', []);
+            foreach ($correctPositions as $index => $letter) {
+                $required = mb_strtoupper((string) $letter, 'UTF-8');
+                $actual = mb_substr($guess, (int) $index, 1, 'UTF-8');
+                if ($actual !== $required) {
+                    return response()->json([
+                        'message' => "Letter {$required} must be in position " . ((int) $index + 1) . '.',
+                    ], 422);
+                }
+            }
+
+            $requiredLetters = $request->input('required_letters', []);
+            foreach ($requiredLetters as $letter) {
+                $required = mb_strtoupper((string) $letter, 'UTF-8');
+                if (! str_contains($guess, $required)) {
+                    return response()->json([
+                        'message' => "Guess must contain letter {$required}.",
+                    ], 422);
+                }
+            }
+        }
+
+        if (! $isTimeUp && ! $this->wordValidationService->exists($language, $guess)) {
             return response()->json(['message' => 'Word not in dictionary.'], 422);
         }
 
@@ -71,7 +96,7 @@ class GameController extends Controller
         ];
 
         $isLastRow = $request->boolean('is_last_row');
-        if ($isWin || ($isLastRow && ! $isWin)) {
+        if ($isTimeUp || $isWin || ($isLastRow && ! $isWin)) {
             $payload['target_word'] = $target;
         }
 
