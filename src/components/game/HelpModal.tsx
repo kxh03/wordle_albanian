@@ -123,6 +123,26 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
             </CardContent>
           </Card>
 
+          {/* Extra Modes */}
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <h3 className="font-semibold mb-2">Modalitetet</h3>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <div>
+                  <p className="font-medium text-foreground">🔥 Mënyra e Vështirë</p>
+                  <p>• Shkronjat e gjelbra duhet të mbeten në të njëjtin pozicion në çdo tentativë tjetër.</p>
+                  <p>• Shkronjat e verdha duhet të përdoren patjetër në tentativat pasuese.</p>
+                  <p>• Nëse nuk i zbaton këto rregulla, tentativa bllokohet.</p>
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">⏱️ Mënyra me Kohë</p>
+                  <p>• Lojtari vendos vetë kohën (në sekonda).</p>
+                  <p>• Kur koha mbaron, loja humbet automatikisht dhe zbulohet fjala.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Button onClick={onClose} className="w-full">
             Filloj të Luaj!
           </Button>
