@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { GameState, LetterState } from '@/types/game';
 import { useLanguage } from '@/contexts/LanguageContext';
 import {
@@ -8,6 +8,12 @@ import {
   type SubmitGuessResponse,
 } from '@/lib/api';
 import { normalizeForWordleMatch } from '@/utils/wordleNormalize';
+import {
+  createEmptyHardModeHints,
+  updateHardModeHints,
+  validateGuessAgainstHardMode,
+  type HardModeHints,
+} from '@/utils/hardMode';
 
 const ROWS = 6;
 const COLS = 5;
@@ -36,7 +42,17 @@ export type WordleGameOptions = {
   serverSnapshot?: ServerDailySnapshot | null;
   /** Submit guess to Laravel (no target token on client). */
   serverSubmitGuess?: (guess: string, rowIndex: number) => Promise<ServerGuessResponse>;
+  hardMode?: boolean;
+  timedMode?: boolean;
+  timeLimitSeconds?: number;
 };
+
+export type InvalidGuessReason =
+  | { code: 'not_in_dictionary' }
+  | { code: 'hard_mode_position'; letter: string; position: number }
+  | { code: 'hard_mode_letter'; letter: string }
+  | { code: 'must_use_revealed_hints' }
+  | { code: 'time_up' };
 
 function mergeLetterStatesFromFeedback(
   prev: Map<string, LetterState>,
@@ -66,6 +82,22 @@ function mapApiRow(result: SubmitGuessResponse['result']): LetterState[] {
     if (r === 'correct' || r === 'partial' || r === 'incorrect') return r;
     return 'incorrect';
   });
+}
+
+function deriveHardModeHintsFromState(state: GameState): HardModeHints {
+  const hints = createEmptyHardModeHints();
+  if (!state.rowFeedback || state.rowFeedback.length === 0) return hints;
+
+  for (let row = 0; row < state.guesses.length; row++) {
+    const guess = state.guesses[row];
+    const feedback = state.rowFeedback[row];
+    if (guess && feedback) {
+      const next = updateHardModeHints(hints, guess, feedback);
+      hints.correctPositions = next.correctPositions;
+      hints.requiredLetters = next.requiredLetters;
+    }
+  }
+  return hints;
 }
 
 function buildInitialFromServerSnapshot(
@@ -138,8 +170,13 @@ export function useWordleGame(targetWord: string, gameId?: string, options?: Wor
   const apiLanguage = options?.apiLanguage ?? 'sq';
   const targetToken = options?.targetToken ?? null;
   const serverSubmitGuess = options?.serverSubmitGuess;
-  const validateGuess =
-    options?.validateGuess ?? ((g: string) => postDictionaryValidate(apiLanguage, g));
+  const validateGuess = useMemo(
+    () => options?.validateGuess ?? ((g: string) => postDictionaryValidate(apiLanguage, g)),
+    [options?.validateGuess, apiLanguage]
+  );
+  const hardMode = options?.hardMode ?? false;
+  const timedMode = options?.timedMode ?? false;
+  const timeLimitSeconds = options?.timeLimitSeconds ?? 60;
 
   const secretWordRef = useRef<string>('');
   const submittingRef = useRef(false);
@@ -189,7 +226,10 @@ export function useWordleGame(targetWord: string, gameId?: string, options?: Wor
 
   const [isRevealing, setIsRevealing] = useState(false);
   const [isWordCompleteAnimating, setIsWordCompleteAnimating] = useState(false);
-  const [invalidReason, setInvalidReason] = useState<string | null>(null);
+  const [invalidReason, setInvalidReason] = useState<InvalidGuessReason | null>(null);
+  const [hardModeHints, setHardModeHints] = useState<HardModeHints>(createEmptyHardModeHints);
+  const [timeLeft, setTimeLeft] = useState<number>(timeLimitSeconds);
+  const [isTimeUp, setIsTimeUp] = useState(false);
 
   const persist = useCallback(
     (state: GameState) => {
@@ -202,10 +242,14 @@ export function useWordleGame(targetWord: string, gameId?: string, options?: Wor
         guesses: state.guesses,
         letterStates: Object.fromEntries(state.letterStates),
         rowFeedback: state.rowFeedback,
+        hardModeHints: {
+          correctPositions: hardModeHints.correctPositions,
+          requiredLetters: [...hardModeHints.requiredLetters],
+        },
       };
       localStorage.setItem(gameId, JSON.stringify(stateToSave));
     },
-    [gameId, mode]
+    [gameId, mode, hardModeHints]
   );
 
   const triggerRevealAnimation = useCallback(() => {
@@ -215,7 +259,7 @@ export function useWordleGame(targetWord: string, gameId?: string, options?: Wor
       setIsWordCompleteAnimating(true);
       setTimeout(() => setIsWordCompleteAnimating(false), 2500);
     }, 1500);
-  });
+  }, []);
 
   const applySubmitResponse = useCallback(
     (guess: string, data: SubmitGuessResponse) => {
@@ -232,7 +276,7 @@ export function useWordleGame(targetWord: string, gameId?: string, options?: Wor
 
         let gameStatus = prev.gameStatus;
         let currentRow = prev.currentRow;
-        let currentCol = 0;
+        const currentCol = 0;
         const guesses = [...prev.guesses, config.normalizeFunction(guess)];
 
         if (isWin) {
@@ -259,6 +303,8 @@ export function useWordleGame(targetWord: string, gameId?: string, options?: Wor
         persist(next);
         return next;
       });
+
+      setHardModeHints((prev) => updateHardModeHints(prev, guess, feedback));
 
       triggerRevealAnimation();
       setInvalidReason(null);
@@ -288,21 +334,31 @@ export function useWordleGame(targetWord: string, gameId?: string, options?: Wor
             guess,
             targetToken: targetToken!,
             isLastRow: rowIndex === ROWS - 1,
+            hardMode,
+            correctPositions: hardModeHints.correctPositions,
+            requiredLetters: [...hardModeHints.requiredLetters],
           });
         }
         applySubmitResponse(guess, data);
       } catch (e: unknown) {
-        const status = (e as { response?: { status?: number } }).response?.status;
+        const status = (e as { status?: number }).status;
+        const message = (e as { message?: string }).message || '';
         if (status === 422) {
-          setInvalidReason('not_in_dictionary');
+          if (message.includes('position')) {
+            setInvalidReason({ code: 'must_use_revealed_hints' });
+          } else if (message.includes('contain letter')) {
+            setInvalidReason({ code: 'must_use_revealed_hints' });
+          } else {
+            setInvalidReason({ code: 'not_in_dictionary' });
+          }
         } else {
-          setInvalidReason('not_in_dictionary');
+          setInvalidReason({ code: 'not_in_dictionary' });
         }
       } finally {
         submittingRef.current = false;
       }
     },
-    [targetToken, apiLanguage, applySubmitResponse, mode, serverSubmitGuess]
+    [targetToken, apiLanguage, applySubmitResponse, mode, serverSubmitGuess, hardMode, hardModeHints]
   );
 
   const submitLocalRow = useCallback(
@@ -313,14 +369,14 @@ export function useWordleGame(targetWord: string, gameId?: string, options?: Wor
       if (validateGuess) {
         const ok = await validateGuess(currentGuess);
         if (!ok) {
-          setInvalidReason('not_in_dictionary');
+          setInvalidReason({ code: 'not_in_dictionary' });
           return;
         }
       }
 
       setGameState((prev) => {
         const nextGuesses = [...prev.guesses, normalizedGuess];
-        let letterStates = new Map(prev.letterStates);
+        const letterStates = new Map(prev.letterStates);
         const matchGuess = normalizeForWordleMatch(currentGuess);
         const matchTarget = normalizeForWordleMatch(target);
         for (let i = 0; i < matchGuess.length; i++) {
@@ -339,7 +395,7 @@ export function useWordleGame(targetWord: string, gameId?: string, options?: Wor
 
         let gameStatus = prev.gameStatus;
         let currentRow = prev.currentRow;
-        let currentCol = 0;
+        const currentCol = 0;
 
         let allEqual = true;
         for (let i = 0; i < COLS; i++) {
@@ -369,6 +425,18 @@ export function useWordleGame(targetWord: string, gameId?: string, options?: Wor
       });
 
       triggerRevealAnimation();
+      setHardModeHints((prev) => {
+        const normalizedTarget = normalizeForWordleMatch(target);
+        const normalizedMatchGuess = normalizeForWordleMatch(normalizedGuess);
+        const feedback = Array.from({ length: COLS }, (_, i) => {
+          const mg = normalizedMatchGuess[i];
+          const mt = normalizedTarget[i];
+          if (mg === mt) return 'correct' as const;
+          if (normalizedTarget.includes(mg)) return 'partial' as const;
+          return 'incorrect' as const;
+        });
+        return updateHardModeHints(prev, normalizedGuess, feedback);
+      });
       setInvalidReason(null);
     },
     [config, validateGuess, persist, triggerRevealAnimation]
@@ -377,6 +445,7 @@ export function useWordleGame(targetWord: string, gameId?: string, options?: Wor
   const handleKeyPress = useCallback(
     (key: string) => {
       if (gameState.gameStatus !== 'playing' || isRevealing) return;
+      if (timedMode && isTimeUp) return;
       if ((mode === 'api' || mode === 'server-daily') && submittingRef.current) return;
 
       if (key === 'BACKSPACE' && invalidReason) {
@@ -388,6 +457,13 @@ export function useWordleGame(targetWord: string, gameId?: string, options?: Wor
         if (mode === 'api' && !targetToken) return;
         if (mode === 'server-daily' && !serverSubmitGuess) return;
         const guess = gameState.board[gameState.currentRow].join('');
+        if (hardMode) {
+          const hardError = validateGuessAgainstHardMode(guess, hardModeHints);
+          if (hardError) {
+            setInvalidReason(hardError);
+            return;
+          }
+        }
         void submitApiRow(guess, gameState.currentRow);
         return;
       }
@@ -395,6 +471,13 @@ export function useWordleGame(targetWord: string, gameId?: string, options?: Wor
       if (key === 'ENTER' && mode === 'local') {
         if (gameState.currentCol !== COLS) return;
         const currentGuess = gameState.board[gameState.currentRow].join('');
+        if (hardMode) {
+          const hardError = validateGuessAgainstHardMode(currentGuess, hardModeHints);
+          if (hardError) {
+            setInvalidReason(hardError);
+            return;
+          }
+        }
         void submitLocalRow(currentGuess);
         return;
       }
@@ -414,16 +497,15 @@ export function useWordleGame(targetWord: string, gameId?: string, options?: Wor
 
           if (newState.currentCol === COLS) {
             const currentGuess = newState.board[newState.currentRow].join('');
-            const normalizedGuess = config.normalizeFunction(currentGuess);
             const target = secretWordRef.current;
             if (validateGuess) {
               void validateGuess(currentGuess).then((ok) => {
-                setInvalidReason(ok ? null : 'not_in_dictionary');
+                setInvalidReason(ok ? null : { code: 'not_in_dictionary' });
               });
             } else {
               const isTargetMatch =
                 normalizeForWordleMatch(currentGuess) === normalizeForWordleMatch(target);
-              setInvalidReason(isTargetMatch ? null : 'not_in_dictionary');
+              setInvalidReason(isTargetMatch ? null : { code: 'not_in_dictionary' });
             }
           } else if (invalidReason) {
             setInvalidReason(null);
@@ -440,13 +522,16 @@ export function useWordleGame(targetWord: string, gameId?: string, options?: Wor
       gameState.currentRow,
       gameState.board,
       isRevealing,
+      isTimeUp,
       invalidReason,
-      gameId,
       config,
       mode,
       targetToken,
       serverSubmitGuess,
       validateGuess,
+      hardMode,
+      hardModeHints,
+      timedMode,
       submitApiRow,
       submitLocalRow,
       persist,
@@ -458,6 +543,70 @@ export function useWordleGame(targetWord: string, gameId?: string, options?: Wor
     const normalized = config.normalizeFunction(targetWord);
     secretWordRef.current = normalized;
   }, [targetWord, config, mode]);
+
+  useEffect(() => {
+    setHardModeHints(deriveHardModeHintsFromState(gameState));
+  }, [gameState]);
+
+  useEffect(() => {
+    if (!timedMode) {
+      setIsTimeUp(false);
+      setTimeLeft(timeLimitSeconds);
+      return;
+    }
+    if (gameState.gameStatus !== 'playing') return;
+    if (timeLeft <= 0) return;
+
+    const timer = window.setInterval(() => {
+      setTimeLeft((prev) => Math.max(0, prev - 1));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [timedMode, gameState.gameStatus, timeLeft, timeLimitSeconds]);
+
+  useEffect(() => {
+    if (!timedMode) return;
+    if (gameState.gameStatus !== 'playing') return;
+    if (gameState.guesses.length > 0) return;
+    setTimeLeft(timeLimitSeconds);
+  }, [timedMode, timeLimitSeconds, gameState.gameStatus, gameState.guesses.length]);
+
+  useEffect(() => {
+    if (!timedMode || isTimeUp || gameState.gameStatus !== 'playing' || timeLeft > 0) return;
+    setIsTimeUp(true);
+    setInvalidReason({ code: 'time_up' });
+    setGameState((prev) => {
+      const next: GameState = { ...prev, gameStatus: 'lost' };
+      persist(next);
+      return next;
+    });
+    if (mode === 'api' && targetToken) {
+      const revealGuess = gameState.board[gameState.currentRow].join('').padEnd(COLS, 'A').slice(0, COLS);
+      void postGamesSubmit({
+        language: apiLanguage,
+        guess: revealGuess,
+        targetToken,
+        isLastRow: true,
+        timeUp: true,
+      }).then((data) => {
+        if (data.target_word) {
+          secretWordRef.current = config.normalizeFunction(data.target_word);
+        }
+      });
+    }
+  }, [
+    timedMode,
+    isTimeUp,
+    gameState.gameStatus,
+    timeLeft,
+    mode,
+    targetToken,
+    apiLanguage,
+    config,
+    gameState.board,
+    gameState.currentRow,
+    persist,
+  ]);
 
   const resetGame = useCallback(
     (newTargetWord?: string) => {
@@ -480,11 +629,14 @@ export function useWordleGame(targetWord: string, gameId?: string, options?: Wor
         letterStates: new Map(),
         rowFeedback: mode === 'api' || mode === 'server-daily' ? [] : undefined,
       });
+      setHardModeHints(createEmptyHardModeHints());
+      setTimeLeft(timeLimitSeconds);
+      setIsTimeUp(false);
       setIsRevealing(false);
       setIsWordCompleteAnimating(false);
       setInvalidReason(null);
     },
-    [targetWord, gameId, config, mode]
+    [targetWord, gameId, config, mode, timeLimitSeconds]
   );
 
   return {
@@ -494,6 +646,9 @@ export function useWordleGame(targetWord: string, gameId?: string, options?: Wor
     handleKeyPress,
     resetGame,
     invalidReason,
+    hardModeHints,
+    timeLeft,
+    isTimeUp,
     getTargetWord: () => secretWordRef.current,
   };
 }
