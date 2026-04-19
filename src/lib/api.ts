@@ -65,6 +65,10 @@ export async function postGamesSubmit(params: {
   guess: string;
   targetToken: string;
   isLastRow: boolean;
+  hardMode?: boolean;
+  timeUp?: boolean;
+  correctPositions?: Record<number, string>;
+  requiredLetters?: string[];
 }): Promise<SubmitGuessResponse> {
   const res = await fetch(`${getApiBase()}/games/submit`, {
     method: 'POST',
@@ -73,10 +77,18 @@ export async function postGamesSubmit(params: {
       guess: params.guess,
       target_token: params.targetToken,
       is_last_row: params.isLastRow,
+      hard_mode: params.hardMode ?? false,
+      time_up: params.timeUp ?? false,
+      correct_positions: params.correctPositions ?? {},
+      required_letters: params.requiredLetters ?? [],
     }),
   });
   if (res.status === 422) {
-    throw Object.assign(new Error('Invalid dictionary word.'), { status: 422 });
+    const err = await res.json().catch(() => ({}));
+    throw Object.assign(new Error((err as { message?: string }).message || 'Validation failed.'), {
+      status: 422,
+      data: err,
+    });
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
