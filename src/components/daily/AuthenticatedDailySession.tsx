@@ -128,7 +128,7 @@ export function AuthenticatedDailySession({
     } else if (gameState.gameStatus === 'lost') {
       completionHandled.current = true;
       toast({
-        title: language === 'english' ? 'Better luck next time! 😅' : 'Më keq këtë herë! 😅',
+        title: language === 'english' ? 'Better luck next time! 😅' : 'Provo përsëri! 😅',
         description:
           language === 'english'
             ? `The word was "${getTargetWord()}".`
