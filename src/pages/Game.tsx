@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { postGamesFree, toApiLanguage } from '@/lib/api';
+import { Flame, Timer } from 'lucide-react';
 
 export default function Game() {
   const { toast, dismiss } = useToast();
@@ -15,12 +16,32 @@ export default function Game() {
 
   const [targetToken, setTargetToken] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [hardMode, setHardMode] = useState<boolean>(() => localStorage.getItem('wordle_hard_mode') === 'true');
+  const [timedMode, setTimedMode] = useState<boolean>(() => localStorage.getItem('wordle_timed_mode') === 'true');
+  const [timedSeconds, setTimedSeconds] = useState<number>(() => {
+    const raw = localStorage.getItem('wordle_timed_seconds');
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) return 60;
+    return Math.max(15, Math.min(600, Math.floor(parsed)));
+  });
 
-  const { gameState, isRevealing, isWordCompleteAnimating, handleKeyPress, resetGame, invalidReason, getTargetWord } =
+  const {
+    gameState,
+    isRevealing,
+    isWordCompleteAnimating,
+    handleKeyPress,
+    resetGame,
+    invalidReason,
+    getTargetWord,
+    timeLeft,
+  } =
     useWordleGame('?????', undefined, {
       mode: 'api',
       apiLanguage: apiLang,
       targetToken,
+      hardMode,
+      timedMode,
+      timeLimitSeconds: timedSeconds,
     });
 
   const loadSession = useCallback(async () => {
@@ -43,6 +64,18 @@ export default function Game() {
       resetGame();
     }
   }, [targetToken, resetGame]);
+
+  useEffect(() => {
+    localStorage.setItem('wordle_hard_mode', String(hardMode));
+  }, [hardMode]);
+
+  useEffect(() => {
+    localStorage.setItem('wordle_timed_mode', String(timedMode));
+  }, [timedMode]);
+
+  useEffect(() => {
+    localStorage.setItem('wordle_timed_seconds', String(timedSeconds));
+  }, [timedSeconds]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -88,13 +121,37 @@ export default function Game() {
   }, [handleKeyPress, config]);
 
   useEffect(() => {
-    if (invalidReason === 'not_in_dictionary') {
+    if (invalidReason?.code === 'not_in_dictionary') {
       toast({
         title: language === 'english' ? 'Word not in dictionary' : 'Kjo fjalë nuk është në fjalorin tonë. Ju lutemi provoni një fjalë tjetër.',
         description:
           language === 'english'
             ? 'Please enter a valid 5-letter word.'
             : 'Ju lutemi shkruani një fjalë të vlefshme me 5 shkronja.',
+      });
+    } else if (invalidReason?.code === 'hard_mode_position') {
+      toast({
+        title: language === 'english' ? 'Must use revealed hints' : 'Duhet të përdorësh ndihmat e zbuluara',
+        description:
+          language === 'english'
+            ? `Letter ${invalidReason.letter} must be in position ${invalidReason.position}.`
+            : `Shkronja ${invalidReason.letter} duhet të jetë në pozicionin ${invalidReason.position}.`,
+      });
+    } else if (invalidReason?.code === 'hard_mode_letter') {
+      toast({
+        title: language === 'english' ? 'Must use revealed hints' : 'Duhet të përdorësh ndihmat e zbuluara',
+        description:
+          language === 'english'
+            ? `Guess must contain letter ${invalidReason.letter}.`
+            : `Fjala duhet të përmbajë shkronjën ${invalidReason.letter}.`,
+      });
+    } else if (invalidReason?.code === 'must_use_revealed_hints') {
+      toast({
+        title: language === 'english' ? 'Must use revealed hints' : 'Duhet të përdorësh ndihmat e zbuluara',
+      });
+    } else if (invalidReason?.code === 'time_up') {
+      toast({
+        title: language === 'english' ? "Time's up!" : 'Koha mbaroi!',
       });
     } else if (invalidReason === null) {
       dismiss();
@@ -128,6 +185,55 @@ export default function Game() {
       />
 
       <div className="flex-1 min-h-0 flex flex-col w-full max-w-lg mx-auto">
+        <div className="px-2 pt-2 pb-1 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Button
+              variant={hardMode ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setHardMode((prev) => !prev)}
+              className="h-8 px-3"
+            >
+              <Flame className="w-4 h-4 mr-1" />
+              {language === 'english' ? 'Hard Mode' : 'Mënyra e vështirë'}
+            </Button>
+            <Button
+              variant={timedMode ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setTimedMode((prev) => !prev)}
+              className="h-8 px-3"
+            >
+              <Timer className="w-4 h-4 mr-1" />
+              {language === 'english' ? 'Timed' : 'Me kohë'}
+            </Button>
+            {timedMode && (
+              <div className="flex items-center gap-1 rounded-md border border-border bg-background px-2 h-8">
+                <span className="text-xs text-muted-foreground">
+                  {language === 'english' ? 'Sec' : 'Sek'}
+                </span>
+                <input
+                  type="number"
+                  min={15}
+                  max={600}
+                  step={5}
+                  value={timedSeconds}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    if (!Number.isFinite(next)) return;
+                    setTimedSeconds(Math.max(15, Math.min(600, Math.floor(next))));
+                  }}
+                  className="w-16 bg-transparent text-sm font-medium outline-none"
+                  aria-label={language === 'english' ? 'Timer seconds' : 'Sekondat e kohëmatësit'}
+                />
+              </div>
+            )}
+          </div>
+          {timedMode && (
+            <div className={`text-sm font-semibold ${timeLeft <= 10 ? 'text-destructive' : 'text-muted-foreground'}`}>
+              ⏱️ {timeLeft}s
+            </div>
+          )}
+        </div>
+
         {!targetToken ? (
           <main className="flex-1 flex flex-col items-center justify-center px-4 py-6 text-center">
             {loadError && <p className="text-destructive text-sm mb-4">{loadError}</p>}
