@@ -44,6 +44,7 @@ In local development, the Vite dev server proxies `/api` to the Laravel app so t
 
 - Creator enters a valid 5-letter word and name; challenge links use an encrypted payload so the word is not plain in the URL.
 - Shared link opens the challenge for other players.
+- Each shared challenge is **single-attempt** for the recipient: once they **win or lose**, the result is saved locally and they **cannot restart** the same link (they can only resume if they haven’t finished yet).
 
 ### 4) Auth (`/login`, `/register`)
 
