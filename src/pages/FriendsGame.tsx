@@ -9,7 +9,7 @@ import { CustomGame } from '@/types/game';
 import { decryptPayload } from '@/utils/crypto';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
-import { Share2, RotateCcw } from 'lucide-react';
+import { Share2 } from 'lucide-react';
 import { postDictionaryValidate, toApiLanguage } from '@/lib/api';
 import type { Language } from '@/types/language';
 
@@ -62,18 +62,15 @@ export default function FriendsGame() {
   const uiLang = (customGame?.language || 'albanian') as Language;
   const apiLang = toApiLanguage(uiLang);
 
-  const { gameState, isRevealing, isWordCompleteAnimating, handleKeyPress, resetGame, getTargetWord, invalidReason } =
-    useWordleGame(customGame?.word || 'FJALE', gameId, {
+  const { gameState, isRevealing, isWordCompleteAnimating, handleKeyPress, getTargetWord, invalidReason } = useWordleGame(
+    customGame?.word || 'FJALE',
+    gameId,
+    {
       mode: 'local',
       apiLanguage: apiLang,
       validateGuess: (g) => postDictionaryValidate(apiLang, g),
-    });
-
-  useEffect(() => {
-    if (customGame?.word) {
-      resetGame(customGame.word);
     }
-  }, [customGame?.word, resetGame]);
+  );
 
   useEffect(() => {
     if (!customGame) return;
@@ -156,7 +153,7 @@ export default function FriendsGame() {
 
   useEffect(() => {
     if (!customGame) return;
-    if (invalidReason === 'not_in_dictionary') {
+    if (invalidReason?.code === 'not_in_dictionary') {
       toast({
         title: customGame.language === 'english' ? 'Word not in dictionary' : 'Kjo fjalë nuk është në fjalorin tonë. Ju lutemi provoni një fjalë tjetër.',
         description:
@@ -188,7 +185,6 @@ export default function FriendsGame() {
     <div className="h-dvh min-h-0 flex flex-col overflow-hidden bg-gradient-subtle overscroll-contain">
       <GameHeader
         title=""
-        onReset={() => resetGame(customGame.word)}
         showFriendsButton={false}
         creatorName={customGame.creatorName}
       />
@@ -287,11 +283,6 @@ export default function FriendsGame() {
                 >
                   <Share2 className="w-4 h-4 mr-2" />
                   {customGame.language === 'english' ? 'Share' : 'Ndaj'}
-                </Button>
-
-                <Button onClick={() => resetGame(customGame.word)} size="sm" variant="outline" className="flex-1 max-w-32">
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  {customGame.language === 'english' ? 'Try Again' : 'Provo Sërish'}
                 </Button>
               </div>
 
