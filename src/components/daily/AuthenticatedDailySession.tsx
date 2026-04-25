@@ -99,7 +99,7 @@ export function AuthenticatedDailySession({
   }, [handleKeyPress, readOnlyArchive, completedView, config]);
 
   useEffect(() => {
-    if (invalidReason === 'not_in_dictionary') {
+    if (invalidReason?.code === 'not_in_dictionary') {
       toast({
         title: language === 'english' ? 'Word not in dictionary' : 'Kjo fjalë nuk është në fjalorin tonë. Ju lutemi provoni një fjalë tjetër.',
         description:
